@@ -220,7 +220,7 @@ def analyze_strava(activities):
     total_runs = len(runs)
     total_dist = sum(a.get("distance", 0) for a in runs)
 
-    recent = sorted(activities, key=lambda a: a["start_date_local"], reverse=True)[:10]
+    recent = sorted(activities, key=lambda a: a["start_date_local"], reverse=True)[:10] if activities else []
 
     hr_runs = [a for a in runs if a.get("average_heartrate")]
     avg_hr = sum(a["average_heartrate"] for a in hr_runs) / len(hr_runs) if hr_runs else None
@@ -956,12 +956,21 @@ def main():
             print("GPX konnte nicht gelesen werden, wird übersprungen.")
 
     print("Verbinde mit Strava...")
-    athlete = fetch_athlete()
-    print(f"Eingeloggt als: {athlete.get('firstname')} {athlete.get('lastname')}")
+    try:
+        athlete = fetch_athlete()
+        print(f"Eingeloggt als: {athlete.get('firstname')} {athlete.get('lastname')}")
+    except Exception as e:
+        print(f"Strava-Profil konnte nicht geladen werden: {e}")
+        athlete = {"firstname": "Philipp", "lastname": ""}
 
     print("Lade Aktivitäten...")
-    activities = fetch_activities()
-    print(f"{len(activities)} Aktivitäten geladen.")
+    try:
+        activities = fetch_activities()
+        print(f"{len(activities)} Aktivitäten geladen.")
+    except Exception as e:
+        print(f"Aktivitäten konnten nicht geladen werden (Token-Scope?): {e}")
+        print("Generiere Report ohne Strava-Daten...")
+        activities = []
 
     print("Analysiere Daten...")
     stats = analyze_strava(activities)
