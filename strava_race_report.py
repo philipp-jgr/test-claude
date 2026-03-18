@@ -2,9 +2,13 @@
 Strava Race Report – Tabernas Desert Ultra 2026
 Analysiert Strava-Daten und erstellt einen personalisierten Trainingsplan als HTML-Report.
 """
+import json
+import math
 import os
+import re
 import sys
 import webbrowser
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -15,6 +19,7 @@ load_dotenv()
 
 ACCESS_TOKEN = os.getenv("STRAVA_ACCESS_TOKEN")
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
+STAGE_COLORS = ["#3498db", "#e67e22", "#e74c3c", "#8e44ad"]
 RACE_DATE = datetime(2026, 5, 18)
 TODAY = datetime.now()
 WEEKS_TO_RACE = max(1, (RACE_DATE - TODAY).days // 7)
@@ -239,6 +244,262 @@ def fitness_level(avg_km):
     return ("Ultra-Erfahren", "#27ae60")
 
 
+# ─────────────────────────────────────────────────────────────
+# GPX PARSING & ROUTE ANALYSIS
+# ─────────────────────────────────────────────────────────────
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def parse_gpx(path):
+    tree = ET.parse(path)
+    root = tree.getroot()
+    m = re.match(r'\{.*?\}', root.tag)
+    ns = m.group(0) if m else ''
+
+    raw = []
+    for trkpt in root.iter(f'{ns}trkpt'):
+        lat = float(trkpt.get('lat'))
+        lon = float(trkpt.get('lon'))
+        ele_el = trkpt.find(f'{ns}ele')
+        ele = float(ele_el.text) if ele_el is not None else 0.0
+        raw.append((lat, lon, ele))
+
+    if len(raw) < 2:
+        return None
+
+    # Cumulative distance
+    cum_dist = [0.0]
+    total_elev_gain = 0.0
+    for i in range(1, len(raw)):
+        d = haversine(raw[i - 1][0], raw[i - 1][1], raw[i][0], raw[i][1])
+        cum_dist.append(cum_dist[-1] + d)
+        if raw[i][2] > raw[i - 1][2]:
+            total_elev_gain += raw[i][2] - raw[i - 1][2]
+
+    total_m = cum_dist[-1]
+    total_km = total_m / 1000
+
+    # Split into 4 equal stages by distance
+    boundaries = [total_m * i / 4 for i in range(5)]
+    stage_indices = [[] for _ in range(4)]
+    current_stage = 0
+    for i, d in enumerate(cum_dist):
+        while current_stage < 3 and d >= boundaries[current_stage + 1]:
+            current_stage += 1
+        stage_indices[current_stage].append(i)
+
+    stages = []
+    stage_map_pts = []
+    stage_chart_pts = []
+
+    for si, idxs in enumerate(stage_indices):
+        if not idxs:
+            stages.append({"km": 0, "elev": 0})
+            stage_map_pts.append([])
+            stage_chart_pts.append([])
+            continue
+
+        # Map points: downsample to max 800 per stage
+        step_m = max(1, len(idxs) // 800)
+        pts_map = [[raw[i][0], raw[i][1]] for i in idxs[::step_m]]
+
+        # Chart points: downsample to max 150 per stage
+        step_c = max(1, len(idxs) // 150)
+        pts_chart = [[round(cum_dist[i] / 1000, 2), round(raw[i][2], 1)] for i in idxs[::step_c]]
+
+        # Stage elevation gain
+        elev_gain = 0.0
+        for k in range(1, len(idxs)):
+            de = raw[idxs[k]][2] - raw[idxs[k - 1]][2]
+            if de > 0:
+                elev_gain += de
+
+        stage_km = (cum_dist[idxs[-1]] - cum_dist[idxs[0]]) / 1000
+        stages.append({"km": stage_km, "elev": elev_gain})
+        stage_map_pts.append(pts_map)
+        stage_chart_pts.append(pts_chart)
+
+    lats = [p[0] for p in raw]
+    lons = [p[1] for p in raw]
+    bounds = [[min(lats), min(lons)], [max(lats), max(lons)]]
+
+    return {
+        "total_km": total_km,
+        "total_elev": total_elev_gain,
+        "stages": stages,
+        "stage_map_pts": stage_map_pts,
+        "stage_chart_pts": stage_chart_pts,
+        "bounds": bounds,
+    }
+
+
+def update_race_week_from_gpx(gpx_data):
+    """Update race week (WEEKLY_PLAN[8]) with actual GPX stage data."""
+    race_week = WEEKLY_PLAN[8]
+    race_week["total_km"] = round(gpx_data["total_km"])
+    race_week["total_elev"] = round(gpx_data["total_elev"])
+    race_week["note"] = (
+        f"GPX-Route: {gpx_data['total_km']:.1f} km · "
+        f"▲ {gpx_data['total_elev']:.0f} m · "
+        "18.–22. Mai 2026 · Solo Unsupported"
+    )
+    stages = gpx_data["stages"]
+    race_days = [d for d in race_week["days"] if d["type"] == "race"]
+    for i, day in enumerate(race_days):
+        if i < len(stages):
+            s = stages[i]
+            day["km"] = round(s["km"], 1)
+            day["elev"] = round(s["elev"])
+            day["note"] = f"Etappe {i + 1}: {s['km']:.1f} km · ▲ {s['elev']:.0f} m · Start 06:00"
+
+
+def render_gpx_section(gpx_data):
+    """Render interactive map + elevation chart + stage stats as HTML."""
+    stage_colors_js = json.dumps(STAGE_COLORS)
+    stage_map_js = json.dumps(gpx_data["stage_map_pts"])
+    stage_chart_js = json.dumps(gpx_data["stage_chart_pts"])
+    bounds_js = json.dumps(gpx_data["bounds"])
+    stage_labels_js = json.dumps([f"Etappe {i + 1}" for i in range(4)])
+
+    total_km = gpx_data["total_km"]
+    total_elev = gpx_data["total_elev"]
+    stages = gpx_data["stages"]
+
+    stage_stats_html = ""
+    for i, s in enumerate(stages):
+        color = STAGE_COLORS[i]
+        stage_stats_html += f"""
+        <div class="stage-stat-card" style="border-top:3px solid {color}">
+          <div class="stage-num" style="color:{color}">Etappe {i + 1}</div>
+          <div class="stage-km">{s['km']:.1f} km</div>
+          <div class="stage-elev">▲ {s['elev']:.0f} m</div>
+        </div>"""
+
+    return f"""
+  <!-- GPX ROUTE -->
+  <div class="section">
+    <div class="section-title">🗺️ Routenanalyse – Tabernas Desert Ultra</div>
+
+    <div class="route-summary">
+      <div class="route-stat"><span class="route-val">{total_km:.1f} km</span><span class="route-lbl">Gesamtdistanz</span></div>
+      <div class="route-stat"><span class="route-val">▲ {total_elev:.0f} m</span><span class="route-lbl">Gesamtanstieg</span></div>
+      <div class="route-stat"><span class="route-val">4</span><span class="route-lbl">Etappen</span></div>
+      <div class="route-stat"><span class="route-val">{total_km / 4:.1f} km</span><span class="route-lbl">Ø pro Etappe</span></div>
+    </div>
+
+    <div class="stage-stats">{stage_stats_html}</div>
+
+    <div id="route-map" style="height:450px;border-radius:12px;overflow:hidden;margin:20px 0;border:1px solid #2c3e50;"></div>
+
+    <div class="chart-container" style="margin-top:0">
+      <div style="color:#7f8c8d;font-size:.85em;margin-bottom:12px">Höhenprofil nach Etappen</div>
+      <canvas id="elevation-chart" height="100"></canvas>
+    </div>
+  </div>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+  (function() {{
+    var stageMapPts = {stage_map_js};
+    var stageChartPts = {stage_chart_js};
+    var stageColors = {stage_colors_js};
+    var bounds = {bounds_js};
+    var stageLabels = {stage_labels_js};
+
+    // Leaflet map
+    var map = L.map('route-map').fitBounds(bounds, {{padding: [20, 20]}});
+    L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+      attribution: '© OpenStreetMap · © CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }}).addTo(map);
+
+    stageMapPts.forEach(function(pts, idx) {{
+      L.polyline(pts, {{color: stageColors[idx], weight: 4, opacity: 0.9}})
+        .addTo(map).bindPopup('Etappe ' + (idx + 1));
+    }});
+
+    // Start marker
+    if (stageMapPts[0] && stageMapPts[0].length) {{
+      L.circleMarker(stageMapPts[0][0], {{
+        radius: 9, color: '#1a8a40', fillColor: '#2ecc71', fillOpacity: 1, weight: 2
+      }}).addTo(map).bindPopup('Start');
+    }}
+
+    // Finish marker
+    var last = stageMapPts[stageMapPts.length - 1];
+    if (last && last.length) {{
+      L.circleMarker(last[last.length - 1], {{
+        radius: 9, color: '#922b21', fillColor: '#e74c3c', fillOpacity: 1, weight: 2
+      }}).addTo(map).bindPopup('Ziel');
+    }}
+
+    // Stage start markers
+    stageMapPts.forEach(function(pts, idx) {{
+      if (idx > 0 && pts.length) {{
+        L.circleMarker(pts[0], {{
+          radius: 6, color: stageColors[idx], fillColor: stageColors[idx], fillOpacity: 0.85, weight: 2
+        }}).addTo(map).bindPopup('Etappe ' + (idx + 1) + ' Start');
+      }}
+    }});
+
+    // Chart.js elevation profile
+    var datasets = stageChartPts.map(function(pts, idx) {{
+      return {{
+        label: stageLabels[idx],
+        data: pts.map(function(p) {{ return {{x: p[0], y: p[1]}}; }}),
+        borderColor: stageColors[idx],
+        backgroundColor: stageColors[idx] + '33',
+        fill: true,
+        pointRadius: 0,
+        borderWidth: 2,
+        tension: 0.3
+      }};
+    }});
+    var ctx = document.getElementById('elevation-chart').getContext('2d');
+    new Chart(ctx, {{
+      type: 'line',
+      data: {{datasets: datasets}},
+      options: {{
+        responsive: true,
+        interaction: {{mode: 'index', intersect: false}},
+        plugins: {{
+          legend: {{labels: {{color: '#ecf0f1', boxWidth: 14}}}},
+          tooltip: {{
+            callbacks: {{
+              label: function(c) {{ return c.dataset.label + ': ' + c.parsed.y.toFixed(0) + ' m'; }},
+              title: function(items) {{ return items[0].parsed.x.toFixed(1) + ' km'; }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            type: 'linear',
+            title: {{display: true, text: 'Distanz (km)', color: '#7f8c8d'}},
+            ticks: {{color: '#7f8c8d'}},
+            grid: {{color: '#1e2d3d'}}
+          }},
+          y: {{
+            title: {{display: true, text: 'Höhe (m)', color: '#7f8c8d'}},
+            ticks: {{color: '#7f8c8d'}},
+            grid: {{color: '#1e2d3d'}}
+          }}
+        }}
+      }}
+    }});
+  }})();
+  </script>"""
+
+
 TYPE_META = {
     "rest":   {"bg": "#1a2633", "bar": "#2c3e50",  "icon": "😴", "label": "–"},
     "easy":   {"bg": "#0d2818", "bar": "#27ae60",  "icon": "🟢", "label": "Easy"},
@@ -283,7 +544,7 @@ def render_week_card(week, week_idx):
     <div class="week-card {'race-week-card' if is_race else ''}">
       <div class="week-header" style="border-left: 4px solid {week['color']}">
         <div class="week-header-left">
-          <span class="week-num">{'RENNWOCHE' if is_race else f'Woche {week[\"num\"]}'}</span>
+          <span class="week-num">{'RENNWOCHE' if is_race else 'Woche ' + str(week['num'])}</span>
           <span class="week-dates">{start_date.strftime('%d.%m.')} – {(start_date + timedelta(days=6)).strftime('%d.%m.%Y')}</span>
         </div>
         <div class="week-header-center">
@@ -298,7 +559,7 @@ def render_week_card(week, week_idx):
     </div>"""
 
 
-def render_html(athlete, stats):
+def render_html(athlete, stats, gpx_data=None):
     level, level_color = fitness_level(stats["avg_weekly_km"])
     race_gap_days = (RACE_DATE - TODAY).days
 
@@ -347,6 +608,7 @@ def render_html(athlete, stats):
 
     # All week cards
     week_cards = "".join(render_week_card(w, i) for i, w in enumerate(WEEKLY_PLAN))
+    gpx_section = render_gpx_section(gpx_data) if gpx_data else ""
 
     return f"""<!DOCTYPE html>
 <html lang="de">
@@ -476,16 +738,35 @@ def render_html(athlete, stats):
   .gear-card li {{ font-size:.83em; padding:3px 0; list-style:none; }}
   .gear-card li::before {{ content:"✓ "; color:#27ae60; }}
 
+  /* ── GPX ROUTE ───────────────────── */
+  .route-summary {{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; }}
+  .route-stat {{
+    flex:1; min-width:130px; background:#1e2d3d; border-radius:12px;
+    padding:18px 20px; border:1px solid #2c3e50; display:flex; flex-direction:column; gap:4px;
+  }}
+  .route-val {{ font-size:1.8em; font-weight:900; color:#f39c12; }}
+  .route-lbl {{ font-size:.73em; color:#7f8c8d; text-transform:uppercase; letter-spacing:1px; }}
+  .stage-stats {{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }}
+  .stage-stat-card {{
+    background:#1e2d3d; border-radius:10px; padding:16px;
+    border:1px solid #2c3e50; text-align:center;
+  }}
+  .stage-num {{ font-size:.8em; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }}
+  .stage-km {{ font-size:1.4em; font-weight:900; color:#ecf0f1; }}
+  .stage-elev {{ font-size:.82em; color:#3498db; margin-top:3px; }}
+
   .footer {{ text-align:center; padding:40px; color:#5d6d7e; font-size:.83em; }}
 
   @media(max-width:900px) {{
     .location-grid {{ grid-template-columns:1fr; }}
     .week-days {{ grid-template-columns:repeat(4,1fr); }}
+    .stage-stats {{ grid-template-columns:repeat(2,1fr); }}
   }}
   @media(max-width:600px) {{
     .hero h1 {{ font-size:1.9em; }}
     .hero .countdown {{ font-size:2.8em; }}
     .week-days {{ grid-template-columns:repeat(2,1fr); }}
+    .stage-stats {{ grid-template-columns:1fr 1fr; }}
   }}
 </style>
 </head>
@@ -592,6 +873,8 @@ def render_html(athlete, stats):
     </div>
   </div>
 
+  {gpx_section}
+
   <!-- TRAININGSPLAN -->
   <div class="section">
     <div class="section-title">📅 8-Wochen-Trainingsplan – Tag für Tag</div>
@@ -661,6 +944,17 @@ def main():
     if not ACCESS_TOKEN:
         sys.exit("STRAVA_ACCESS_TOKEN nicht gesetzt.")
 
+    gpx_path = next((a for a in sys.argv[1:] if a.endswith(".gpx")), None)
+    gpx_data = None
+    if gpx_path:
+        print(f"Lade GPX-Route: {gpx_path}")
+        gpx_data = parse_gpx(gpx_path)
+        if gpx_data:
+            print(f"GPX: {gpx_data['total_km']:.1f} km · ▲ {gpx_data['total_elev']:.0f} m")
+            update_race_week_from_gpx(gpx_data)
+        else:
+            print("GPX konnte nicht gelesen werden, wird übersprungen.")
+
     print("Verbinde mit Strava...")
     athlete = fetch_athlete()
     print(f"Eingeloggt als: {athlete.get('firstname')} {athlete.get('lastname')}")
@@ -673,7 +967,7 @@ def main():
     stats = analyze_strava(activities)
 
     print("Generiere Report...")
-    html = render_html(athlete, stats)
+    html = render_html(athlete, stats, gpx_data)
 
     out = os.path.join(os.path.expanduser("~"), "Downloads", "tabernas_race_report.html")
     with open(out, "w", encoding="utf-8") as f:
