@@ -225,6 +225,26 @@ def analyze_strava(activities):
     hr_runs = [a for a in runs if a.get("average_heartrate")]
     avg_hr = sum(a["average_heartrate"] for a in hr_runs) / len(hr_runs) if hr_runs else None
 
+    # Max HR from recorded peaks across all HR activities
+    max_hr_vals = [a["max_heartrate"] for a in runs if a.get("max_heartrate", 0) > 100]
+    max_hr = max(max_hr_vals) if max_hr_vals else None
+
+    # Median pace from "real" runs (5–25 km, proper running pace)
+    proper_run_types = {"Run", "TrailRun"}
+    pace_samples = []
+    for a in runs:
+        d = a.get("distance", 0)
+        t = a.get("moving_time", 0)
+        stype = a.get("sport_type") or a.get("type", "")
+        if stype in proper_run_types and 5000 < d < 30000 and t > 0:
+            pace = (t / 60) / (d / 1000)
+            if 4.0 < pace < 11.0:
+                pace_samples.append(pace)
+    avg_pace_minkm = None
+    if pace_samples:
+        pace_samples.sort()
+        avg_pace_minkm = pace_samples[len(pace_samples) // 2]  # median
+
     return {
         "total_runs": total_runs,
         "total_dist": total_dist / 1000,
@@ -234,7 +254,66 @@ def analyze_strava(activities):
         "weekly": weekly,
         "recent": recent,
         "avg_hr": avg_hr,
+        "max_hr": max_hr,
+        "avg_pace_minkm": avg_pace_minkm,
     }
+
+
+def fmt_pace(minkm):
+    m = int(minkm)
+    s = int(round((minkm - m) * 60))
+    if s == 60:
+        m += 1; s = 0
+    return f"{m}:{s:02d} min/km"
+
+
+def compute_zones(stats):
+    """Leitet persönliche HR-Zonen und Pace-Vorgaben aus Strava-Daten ab."""
+    max_hr = stats.get("max_hr")
+    avg_pace = stats.get("avg_pace_minkm")
+
+    # ── HR-Zonen (5-Zonen-Modell auf Basis HFmax) ──────────────
+    hr = None
+    if max_hr and max_hr > 155:
+        h = int(max_hr)
+        hr = {
+            "max": h,
+            "z1": (0,           int(h * 0.60)),
+            "z2": (int(h * 0.60), int(h * 0.70)),
+            "z3": (int(h * 0.70), int(h * 0.80)),
+            "z4": (int(h * 0.80), int(h * 0.90)),
+            "z5": (int(h * 0.90), h),
+        }
+
+    # ── Pace-Zonen (basierend auf Median-Trainingspace) ─────────
+    pace = None
+    if avg_pace and 4.0 < avg_pace < 11.0:
+        pace = {
+            "easy":   f"{fmt_pace(avg_pace + 0.75)}–{fmt_pace(avg_pace + 1.25)}",
+            "long":   f"{fmt_pace(avg_pace + 0.50)}–{fmt_pace(avg_pace + 1.00)}",
+            "tempo":  f"{fmt_pace(avg_pace - 0.50)}–{fmt_pace(avg_pace - 0.15)}",
+            "hills":  "Effort-basiert · bergauf Power-Hiking",
+            "b2b":    f"{fmt_pace(avg_pace + 0.75)}–{fmt_pace(avg_pace + 1.50)}",
+            "active": "Sehr locker / Gehen",
+            "rest":   "–",
+            "race":   f"{fmt_pace(avg_pace + 0.25)}–{fmt_pace(avg_pace + 0.75)}",
+        }
+
+    # ── HR-Zielbereiche pro Trainingstyp (in BPM) ───────────────
+    hr_targets = {}
+    if hr:
+        hr_targets = {
+            "rest":   None,
+            "easy":   (hr["z2"][0], hr["z2"][1]),
+            "tempo":  (hr["z3"][0], hr["z4"][1]),
+            "hills":  (hr["z3"][0], hr["z4"][1]),
+            "long":   (hr["z2"][0], hr["z3"][1]),
+            "b2b":    (hr["z2"][0], hr["z3"][1]),
+            "active": (0,           hr["z1"][1]),
+            "race":   (hr["z2"][0], hr["z4"][1]),
+        }
+
+    return {"hr": hr, "pace": pace, "hr_targets": hr_targets}
 
 
 def fitness_level(avg_km):
@@ -505,54 +584,70 @@ TYPE_META = {
         "bg": "#1a2633", "bar": "#2c3e50", "icon": "😴", "label": "–",
         "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50",
         "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung",
+        "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"],
+        "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"],
         "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"],
     },
     "easy": {
         "bg": "#0d2818", "bar": "#27ae60", "icon": "🟢", "label": "Easy",
         "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60",
         "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich",
-        "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"],
+        "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"],
+        "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"],
+        "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"],
     },
     "tempo": {
         "bg": "#2b1f00", "bar": "#f39c12", "icon": "⚡", "label": "Tempo",
         "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12",
         "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch",
-        "tips": ["Aufwärmen: 15 min locker vor dem Tempo", "Tempoabschnitte nie überpacen", "Abkühlen: 10 min locker ausklingen lassen", "HF im Zielbereich halten – nicht überziehen", "KH-Versorgung während und nach dem Lauf"],
+        "structure": ["15 min locker einlaufen (Zone 1–2)", "Tempoabschnitte laut Plan (Zone 3–4)", "10–15 min locker auslaufen"],
+        "nutrition": ["2 h vorher KH-reiche Mahlzeit", "Gel direkt nach dem letzten Tempoblock", "Viel trinken – auch vor dem Lauf"],
+        "tips": ["Nie zu schnell beginnen – gleichmäßige Splits", "HF darf kurz in Z4, aber nicht dauerhaft", "Sätze: kurze Erholungspause zwischen Blöcken", "Abkühlen nicht weglassen", "Qualität vor Quantität"],
     },
     "hills": {
         "bg": "#2b1200", "bar": "#e67e22", "icon": "⛰️", "label": "Berge",
         "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22",
         "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab",
-        "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"],
+        "structure": ["10 min flach einlaufen", "Bergintervalle: laufen/marschieren bergauf", "Locker bergab (aktive Pause) · wiederholen"],
+        "nutrition": ["KH-reich 2 h vorher", "Gel nach dem 2. Intervall", "Mehr trinken als normal – Anstrengung unterschätzt"],
+        "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Power-Hiking bergauf = spart Energie für Wüste", "Bergab: Knie weich, keine Bremskraft", "HF bergauf kurz in Z4 – dann bergab erholen", "Marschtechnik mit Stöcken üben"],
     },
     "long": {
         "bg": "#0a1f3d", "bar": "#2980b9", "icon": "🔵", "label": "Lang",
         "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9",
         "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig",
-        "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"],
+        "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"],
+        "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"],
+        "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"],
     },
     "b2b": {
         "bg": "#1e0a2b", "bar": "#8e44ad", "icon": "🔥", "label": "B2B",
         "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad",
         "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren",
-        "tips": ["Ziel: Laufen auf müden Beinen – nicht Pace!", "Keine neuen Schuhe oder Ausrüstung testen", "Zwischen Tag 1 und 2: gut essen, Beine kühlen", "HF kann höher sein als normal – das ist okay", "Recovery-Protokoll nach dem Lauf konsequent"],
+        "structure": ["Locker einlaufen (egal wie lange es dauert)", "Hauptteil: Wüstenpace – Pace unwichtig", "Auslaufen + sofortige Recovery-Maßnahmen"],
+        "nutrition": ["Abends vorher: max. KH-Aufnahme", "Morgens: KH + etwas Protein", "Gel alle 40 min – HF-gesteuertes Tempo", "Sofort nach Ziel: Protein-Shake + Salz"],
+        "tips": ["Ziel ist Laufen auf müden Beinen – nicht Pace!", "HF wird höher als normal sein – das ist okay", "Keine neuen Schuhe oder Ausrüstung", "Zwischen Tag 1 und 2: Beine kühlen/hochlegen", "Recovery-Protokoll sofort nach Ankunft"],
     },
     "active": {
         "bg": "#061a18", "bar": "#16a085", "icon": "🌿", "label": "Aktiv",
         "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085",
         "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung",
-        "tips": ["Spazieren, Schwimmen oder leichtes Radfahren", "Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung und Erholung", "Dehnen & Mobilität 20–30 min", "Früh schlafen gehen"],
+        "structure": ["Spazieren, Schwimmen oder lockeres Radfahren", "30–60 min – kein Leistungsdruck", "Dehnen & Mobilität 20 min"],
+        "nutrition": ["Normal essen – Regeneration braucht Nährstoffe", "Proteinreich für Muskelreparatur", "Ausreichend trinken"],
+        "tips": ["Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung", "Schlaf priorisieren", "Körpersignale ernst nehmen", "Früh schlafen gehen"],
     },
     "race": {
         "bg": "#2b0000", "bar": "#e74c3c", "icon": "🏁", "label": "RACE",
         "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c",
         "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag",
-        "tips": ["Früh starten (06:00) – Hitze meiden", "Siesta 12:00–15:00 Uhr strikt einhalten", "Wasser immer auf > 1,5 L auffüllen", "Ernährung alle 45 min – auch ohne Hunger", "Blasen sofort mit Leukoplast versorgen"],
+        "structure": ["Start 06:00 – erste 10 km bewusst locker", "Mittelteil stabil in Zone 2–3", "Siesta 12–15 Uhr · dann Abendmarsch"],
+        "nutrition": ["Vorher: großes KH-Frühstück 2 h vor Start", "Gel alle 40–45 min während des Laufens", "Wasser nie unter 1,5 L · Salztabletten", "In Siesta: Mahlzeit + Schlaf wenn möglich"],
+        "tips": ["Früh starten – Hitze meiden", "Siesta 12–15 Uhr strikt einhalten", "Wasser immer > 1,5 L nachfüllen", "Blasen sofort mit Leukoplast versorgen", "Navigation: GPX offline + Backup"],
     },
 }
 
 
-def render_week_card(week, week_idx):
+def render_week_card(week, week_idx, zones=None):
     start_date = TODAY + timedelta(weeks=week_idx)
     # For race week, use actual race date
     if week["num"] == 9:
@@ -564,7 +659,21 @@ def render_week_card(week, week_idx):
         km_str = f"{day['km']} km" if day["km"] else "–"
         elev_str = f"▲ {day['elev']} m" if day["elev"] else ""
         day_date = start_date + timedelta(days=["Mo","Di","Mi","Do","Fr","Sa","So"].index(day["d"]))
-        # Build data payload for modal
+
+        # Personal HR target in BPM
+        hr_bpm = "–"
+        if zones and zones.get("hr_targets") and zones["hr_targets"].get(day["type"]):
+            lo, hi = zones["hr_targets"][day["type"]]
+            hr_bpm = f"{lo}–{hi} bpm"
+
+        # Personal pace target
+        pace_target = "–"
+        if zones and zones.get("pace"):
+            pace_target = zones["pace"].get(day["type"], "–")
+
+        # Max HR for zone bar rendering
+        max_hr = zones["hr"]["max"] if (zones and zones.get("hr")) else None
+
         day_data = json.dumps({
             "weekNum": week["num"],
             "weekFocus": week["focus"],
@@ -581,9 +690,14 @@ def render_week_card(week, week_idx):
             "hr_zone": m["hr_zone"],
             "hr_pct": m["hr_pct"],
             "hr_color": m["hr_color"],
+            "hr_bpm": hr_bpm,
+            "pace_target": pace_target,
+            "max_hr": max_hr,
             "rpe_low": m["rpe_low"],
             "rpe_high": m["rpe_high"],
             "rpe_label": m["rpe_label"],
+            "structure": m.get("structure", []),
+            "nutrition": m.get("nutrition", []),
             "tips": m["tips"],
         }, ensure_ascii=False)
         day_cells += f"""
@@ -670,8 +784,11 @@ def render_html(athlete, stats, gpx_data=None):
         for k, v in TYPE_META.items()
     )
 
+    # Personal zones derived from Strava data
+    zones = compute_zones(stats)
+
     # All week cards
-    week_cards = "".join(render_week_card(w, i) for i, w in enumerate(WEEKLY_PLAN))
+    week_cards = "".join(render_week_card(w, i, zones) for i, w in enumerate(WEEKLY_PLAN))
     gpx_section = render_gpx_section(gpx_data) if gpx_data else ""
 
     return f"""<!DOCTYPE html>
@@ -857,7 +974,7 @@ def render_html(athlete, stats, gpx_data=None):
     line-height:1; padding:0 4px; transition:color .15s;
   }}
   .day-modal-close:hover {{ color:#ecf0f1; }}
-  .day-modal-body {{ padding:22px 26px; display:flex; flex-direction:column; gap:18px; }}
+  .day-modal-body {{ padding:22px 26px; display:flex; flex-direction:column; gap:18px; max-height:80vh; overflow-y:auto; }}
 
   /* HR Zone */
   .modal-section-label {{
@@ -939,26 +1056,27 @@ def render_html(athlete, stats, gpx_data=None):
       <button class="day-modal-close" onclick="document.getElementById('dayModalOverlay').classList.remove('open')">✕</button>
     </div>
     <div class="day-modal-body">
-      <!-- Stats -->
+      <!-- Quick stats -->
       <div id="modalStats" class="modal-stats"></div>
+
       <!-- HR Zone -->
       <div id="modalHrSection">
-        <div class="modal-section-label">Herzfrequenz-Zone</div>
+        <div class="modal-section-label">Herzfrequenz-Zielbereich</div>
         <div class="hr-zone-bar" id="modalHrBar">
-          <div class="hr-zone-seg" style="background:#1e6b2e"></div>
-          <div class="hr-zone-seg" style="background:#27ae60"></div>
-          <div class="hr-zone-seg" style="background:#f39c12"></div>
-          <div class="hr-zone-seg" style="background:#e67e22"></div>
-          <div class="hr-zone-seg" style="background:#e74c3c"></div>
+          <div class="hr-zone-seg"></div><div class="hr-zone-seg"></div>
+          <div class="hr-zone-seg"></div><div class="hr-zone-seg"></div>
+          <div class="hr-zone-seg"></div>
         </div>
         <div class="hr-zone-info">
           <span class="hr-zone-badge" id="modalHrBadge"></span>
           <span class="hr-zone-pct" id="modalHrPct"></span>
         </div>
-        <div style="font-size:.7em; color:#4a5a6a; margin-top:6px">Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 &gt;90% HFmax</div>
+        <div id="modalHrBpmRow" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <div style="font-size:.68em; color:#4a5a6a; margin-top:5px">Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 &gt;90% HFmax</div>
       </div>
+
       <!-- RPE -->
-      <div>
+      <div id="modalRpeSection">
         <div class="modal-section-label">RPE – Belastungsempfinden (1–10)</div>
         <div class="rpe-track" id="modalRpeTrack"></div>
         <div class="rpe-info">
@@ -966,9 +1084,23 @@ def render_html(athlete, stats, gpx_data=None):
           <span class="rpe-num" id="modalRpeNum"></span>
         </div>
       </div>
-      <!-- Note -->
+
+      <!-- Einheits-Struktur -->
+      <div id="modalStructureSection">
+        <div class="modal-section-label">Einheits-Aufbau</div>
+        <ol class="modal-structure-list" id="modalStructure"></ol>
+      </div>
+
+      <!-- Heute-Note -->
       <div class="modal-note" id="modalNote"></div>
-      <!-- Tips -->
+
+      <!-- Ernährung -->
+      <div id="modalNutritionSection">
+        <div class="modal-section-label">Ernährung & Hydration</div>
+        <ul class="modal-tips" id="modalNutrition"></ul>
+      </div>
+
+      <!-- Tipps -->
       <div>
         <div class="modal-section-label">Trainings-Tipps</div>
         <ul class="modal-tips" id="modalTips"></ul>
@@ -984,63 +1116,102 @@ function openDayModal(el) {{
   document.getElementById('modalDate').textContent = d.d + ', ' + d.date;
   document.getElementById('modalWeek').textContent = 'Woche ' + d.weekNum + ' – ' + d.weekFocus;
 
-  // Stats
+  // ── Quick stats ────────────────────────────────────────────
   var statsHtml = '';
-  if (d.km > 0) statsHtml += '<div class="modal-stat"><div class="val">' + d.km + ' km</div><div class="lbl">Distanz</div></div>';
-  if (d.elev > 0) statsHtml += '<div class="modal-stat"><div class="val">▲ ' + d.elev + ' m</div><div class="lbl">Anstieg</div></div>';
-  if (d.hr_zone !== '–') statsHtml += '<div class="modal-stat"><div class="val" style="color:' + d.hr_color + '">' + d.hr_zone + '</div><div class="lbl">HF-Zone</div></div>';
-  if (d.rpe_high > 0) statsHtml += '<div class="modal-stat"><div class="val">' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10</div><div class="lbl">RPE</div></div>';
+  if (d.km > 0)
+    statsHtml += '<div class="modal-stat"><div class="val">' + d.km + ' km</div><div class="lbl">Distanz</div></div>';
+  if (d.elev > 0)
+    statsHtml += '<div class="modal-stat"><div class="val">▲ ' + d.elev + ' m</div><div class="lbl">Anstieg</div></div>';
+  if (d.hr_bpm && d.hr_bpm !== '–')
+    statsHtml += '<div class="modal-stat"><div class="val" style="color:' + d.hr_color + ';font-size:1em">' + d.hr_bpm + '</div><div class="lbl">Ziel-HF</div></div>';
+  if (d.pace_target && d.pace_target !== '–')
+    statsHtml += '<div class="modal-stat"><div class="val" style="font-size:.9em">' + d.pace_target + '</div><div class="lbl">Ziel-Pace</div></div>';
   document.getElementById('modalStats').innerHTML = statsHtml;
 
-  // HR Zone bar highlight
-  var hrBar = document.getElementById('modalHrBar');
-  var segs = hrBar.querySelectorAll('.hr-zone-seg');
-  var zoneColors = ['#1e6b2e','#27ae60','#f39c12','#e67e22','#e74c3c'];
-  var dimColors  = ['#0d2e14','#163d20','#2b1f00','#1e1000','#200000'];
-  segs.forEach(function(s, i) {{
-    s.style.background = dimColors[i];
-  }});
-  var zoneMap = {{'Zone 1':0,'Zone 2':1,'Zone 3':2,'Zone 3–4':[2,3],'Zone 4':3,'Zone 5':4,'Zone 2–3':[1,2],'Zone 2–4':[1,2,3]}};
-  var active = zoneMap[d.hr_zone];
-  if (active !== undefined) {{
-    if (!Array.isArray(active)) active = [active];
-    active.forEach(function(idx) {{ segs[idx].style.background = zoneColors[idx]; }});
-  }}
-  document.getElementById('modalHrBadge').textContent = d.hr_zone;
-  document.getElementById('modalHrBadge').style.background = d.hr_color;
-  document.getElementById('modalHrPct').textContent = d.hr_pct + ' HFmax';
+  // ── HR Zone bar ────────────────────────────────────────────
   var hrSection = document.getElementById('modalHrSection');
   hrSection.style.display = (d.hr_zone === '–') ? 'none' : 'block';
+  if (d.hr_zone !== '–') {{
+    var hrBar = document.getElementById('modalHrBar');
+    var segs = hrBar.querySelectorAll('.hr-zone-seg');
+    var zoneColors = ['#1e6b2e','#27ae60','#f39c12','#e67e22','#e74c3c'];
+    var dimColors  = ['#0d2e14','#163d20','#2b1f00','#1e1000','#200000'];
+    segs.forEach(function(s,i){{ s.style.background = dimColors[i]; }});
+    var zoneMap = {{'Zone 1':[0],'Zone 2':[1],'Zone 3':[2],'Zone 3–4':[2,3],'Zone 4':[3],'Zone 5':[4],'Zone 2–3':[1,2],'Zone 2–4':[1,2,3]}};
+    var active = zoneMap[d.hr_zone] || [];
+    active.forEach(function(idx){{ segs[idx].style.background = zoneColors[idx]; }});
+    document.getElementById('modalHrBadge').textContent = d.hr_zone;
+    document.getElementById('modalHrBadge').style.background = d.hr_color;
+    document.getElementById('modalHrPct').textContent = d.hr_pct + ' HFmax';
 
-  // RPE track
-  var rpeTrack = document.getElementById('modalRpeTrack');
-  rpeTrack.innerHTML = '';
-  for (var i = 1; i <= 10; i++) {{
-    var dot = document.createElement('div');
-    dot.className = 'rpe-dot';
-    var active_rpe = (i >= d.rpe_low && i <= d.rpe_high);
-    var rpe_color = i <= 3 ? '#27ae60' : i <= 5 ? '#f1c40f' : i <= 7 ? '#e67e22' : '#e74c3c';
-    dot.style.background = active_rpe ? rpe_color : '#1e2d3d';
-    rpeTrack.appendChild(dot);
+    // Per-zone BPM chips (only when max_hr is known)
+    var bpmRow = document.getElementById('modalHrBpmRow');
+    bpmRow.innerHTML = '';
+    if (d.max_hr) {{
+      var h = d.max_hr;
+      var zNames = ['Z1','Z2','Z3','Z4','Z5'];
+      var zRanges = [
+        '<' + Math.round(h*0.60),
+        Math.round(h*0.60) + '–' + Math.round(h*0.70),
+        Math.round(h*0.70) + '–' + Math.round(h*0.80),
+        Math.round(h*0.80) + '–' + Math.round(h*0.90),
+        '>' + Math.round(h*0.90)
+      ];
+      active.forEach(function(idx) {{
+        var chip = document.createElement('span');
+        chip.style.cssText = 'background:' + zoneColors[idx] + '22;border:1px solid ' + zoneColors[idx] + ';border-radius:20px;padding:3px 10px;font-size:.75em;color:' + zoneColors[idx];
+        chip.textContent = zNames[idx] + ': ' + zRanges[idx] + ' bpm';
+        bpmRow.appendChild(chip);
+      }});
+    }}
   }}
-  document.getElementById('modalRpeLabel').textContent = d.rpe_label;
-  document.getElementById('modalRpeNum').textContent = 'RPE ' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10';
 
-  // Note
+  // ── RPE ────────────────────────────────────────────────────
+  var rpeSection = document.getElementById('modalRpeSection');
+  rpeSection.style.display = (d.rpe_high === 0) ? 'none' : 'block';
+  if (d.rpe_high > 0) {{
+    var rpeTrack = document.getElementById('modalRpeTrack');
+    rpeTrack.innerHTML = '';
+    for (var i = 1; i <= 10; i++) {{
+      var dot = document.createElement('div');
+      dot.className = 'rpe-dot';
+      var on = (i >= d.rpe_low && i <= d.rpe_high);
+      dot.style.background = on ? (i<=3?'#27ae60':i<=5?'#f1c40f':i<=7?'#e67e22':'#e74c3c') : '#1e2d3d';
+      rpeTrack.appendChild(dot);
+    }}
+    document.getElementById('modalRpeLabel').textContent = d.rpe_label;
+    document.getElementById('modalRpeNum').textContent = 'RPE ' + (d.rpe_low===d.rpe_high ? d.rpe_low : d.rpe_low+'–'+d.rpe_high) + ' / 10';
+  }}
+
+  // ── Einheits-Struktur ──────────────────────────────────────
+  var structure = d.structure || [];
+  var structSection = document.getElementById('modalStructureSection');
+  structSection.style.display = structure.length ? 'block' : 'none';
+  document.getElementById('modalStructure').innerHTML = structure.map(function(s,i) {{
+    return '<li style="font-size:.84em;padding:6px 0;border-bottom:1px solid #1e2d3d;color:#bdc3c7;list-style:none;display:flex;gap:8px"><span style="color:#f39c12;font-weight:700;flex-shrink:0">' + (i+1) + '.</span>' + s + '</li>';
+  }}).join('');
+
+  // ── Note ───────────────────────────────────────────────────
   document.getElementById('modalNote').textContent = d.note;
 
-  // Tips
-  var tips = d.tips || [];
-  document.getElementById('modalTips').innerHTML = tips.map(function(t) {{
+  // ── Ernährung ──────────────────────────────────────────────
+  var nutrition = d.nutrition || [];
+  var nutrSection = document.getElementById('modalNutritionSection');
+  nutrSection.style.display = nutrition.length ? 'block' : 'none';
+  document.getElementById('modalNutrition').innerHTML = nutrition.map(function(n) {{
+    return '<li>' + n + '</li>';
+  }}).join('');
+
+  // ── Tipps ──────────────────────────────────────────────────
+  document.getElementById('modalTips').innerHTML = (d.tips||[]).map(function(t) {{
     return '<li>' + t + '</li>';
   }}).join('');
 
   document.getElementById('dayModalOverlay').classList.add('open');
 }}
 function closeDayModal(e) {{
-  if (e.target === document.getElementById('dayModalOverlay')) {{
+  if (e.target === document.getElementById('dayModalOverlay'))
     document.getElementById('dayModalOverlay').classList.remove('open');
-  }}
 }}
 document.addEventListener('keydown', function(e) {{
   if (e.key === 'Escape') document.getElementById('dayModalOverlay').classList.remove('open');

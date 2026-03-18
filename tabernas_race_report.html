@@ -181,7 +181,7 @@
     line-height:1; padding:0 4px; transition:color .15s;
   }
   .day-modal-close:hover { color:#ecf0f1; }
-  .day-modal-body { padding:22px 26px; display:flex; flex-direction:column; gap:18px; }
+  .day-modal-body { padding:22px 26px; display:flex; flex-direction:column; gap:18px; max-height:80vh; overflow-y:auto; }
 
   /* HR Zone */
   .modal-section-label {
@@ -263,26 +263,27 @@
       <button class="day-modal-close" onclick="document.getElementById('dayModalOverlay').classList.remove('open')">✕</button>
     </div>
     <div class="day-modal-body">
-      <!-- Stats -->
+      <!-- Quick stats -->
       <div id="modalStats" class="modal-stats"></div>
+
       <!-- HR Zone -->
       <div id="modalHrSection">
-        <div class="modal-section-label">Herzfrequenz-Zone</div>
+        <div class="modal-section-label">Herzfrequenz-Zielbereich</div>
         <div class="hr-zone-bar" id="modalHrBar">
-          <div class="hr-zone-seg" style="background:#1e6b2e"></div>
-          <div class="hr-zone-seg" style="background:#27ae60"></div>
-          <div class="hr-zone-seg" style="background:#f39c12"></div>
-          <div class="hr-zone-seg" style="background:#e67e22"></div>
-          <div class="hr-zone-seg" style="background:#e74c3c"></div>
+          <div class="hr-zone-seg"></div><div class="hr-zone-seg"></div>
+          <div class="hr-zone-seg"></div><div class="hr-zone-seg"></div>
+          <div class="hr-zone-seg"></div>
         </div>
         <div class="hr-zone-info">
           <span class="hr-zone-badge" id="modalHrBadge"></span>
           <span class="hr-zone-pct" id="modalHrPct"></span>
         </div>
-        <div style="font-size:.7em; color:#4a5a6a; margin-top:6px">Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 &gt;90% HFmax</div>
+        <div id="modalHrBpmRow" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <div style="font-size:.68em; color:#4a5a6a; margin-top:5px">Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 &gt;90% HFmax</div>
       </div>
+
       <!-- RPE -->
-      <div>
+      <div id="modalRpeSection">
         <div class="modal-section-label">RPE – Belastungsempfinden (1–10)</div>
         <div class="rpe-track" id="modalRpeTrack"></div>
         <div class="rpe-info">
@@ -290,9 +291,23 @@
           <span class="rpe-num" id="modalRpeNum"></span>
         </div>
       </div>
-      <!-- Note -->
+
+      <!-- Einheits-Struktur -->
+      <div id="modalStructureSection">
+        <div class="modal-section-label">Einheits-Aufbau</div>
+        <ol class="modal-structure-list" id="modalStructure"></ol>
+      </div>
+
+      <!-- Heute-Note -->
       <div class="modal-note" id="modalNote"></div>
-      <!-- Tips -->
+
+      <!-- Ernährung -->
+      <div id="modalNutritionSection">
+        <div class="modal-section-label">Ernährung & Hydration</div>
+        <ul class="modal-tips" id="modalNutrition"></ul>
+      </div>
+
+      <!-- Tipps -->
       <div>
         <div class="modal-section-label">Trainings-Tipps</div>
         <ul class="modal-tips" id="modalTips"></ul>
@@ -308,63 +323,102 @@ function openDayModal(el) {
   document.getElementById('modalDate').textContent = d.d + ', ' + d.date;
   document.getElementById('modalWeek').textContent = 'Woche ' + d.weekNum + ' – ' + d.weekFocus;
 
-  // Stats
+  // ── Quick stats ────────────────────────────────────────────
   var statsHtml = '';
-  if (d.km > 0) statsHtml += '<div class="modal-stat"><div class="val">' + d.km + ' km</div><div class="lbl">Distanz</div></div>';
-  if (d.elev > 0) statsHtml += '<div class="modal-stat"><div class="val">▲ ' + d.elev + ' m</div><div class="lbl">Anstieg</div></div>';
-  if (d.hr_zone !== '–') statsHtml += '<div class="modal-stat"><div class="val" style="color:' + d.hr_color + '">' + d.hr_zone + '</div><div class="lbl">HF-Zone</div></div>';
-  if (d.rpe_high > 0) statsHtml += '<div class="modal-stat"><div class="val">' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10</div><div class="lbl">RPE</div></div>';
+  if (d.km > 0)
+    statsHtml += '<div class="modal-stat"><div class="val">' + d.km + ' km</div><div class="lbl">Distanz</div></div>';
+  if (d.elev > 0)
+    statsHtml += '<div class="modal-stat"><div class="val">▲ ' + d.elev + ' m</div><div class="lbl">Anstieg</div></div>';
+  if (d.hr_bpm && d.hr_bpm !== '–')
+    statsHtml += '<div class="modal-stat"><div class="val" style="color:' + d.hr_color + ';font-size:1em">' + d.hr_bpm + '</div><div class="lbl">Ziel-HF</div></div>';
+  if (d.pace_target && d.pace_target !== '–')
+    statsHtml += '<div class="modal-stat"><div class="val" style="font-size:.9em">' + d.pace_target + '</div><div class="lbl">Ziel-Pace</div></div>';
   document.getElementById('modalStats').innerHTML = statsHtml;
 
-  // HR Zone bar highlight
-  var hrBar = document.getElementById('modalHrBar');
-  var segs = hrBar.querySelectorAll('.hr-zone-seg');
-  var zoneColors = ['#1e6b2e','#27ae60','#f39c12','#e67e22','#e74c3c'];
-  var dimColors  = ['#0d2e14','#163d20','#2b1f00','#1e1000','#200000'];
-  segs.forEach(function(s, i) {
-    s.style.background = dimColors[i];
-  });
-  var zoneMap = {'Zone 1':0,'Zone 2':1,'Zone 3':2,'Zone 3–4':[2,3],'Zone 4':3,'Zone 5':4,'Zone 2–3':[1,2],'Zone 2–4':[1,2,3]};
-  var active = zoneMap[d.hr_zone];
-  if (active !== undefined) {
-    if (!Array.isArray(active)) active = [active];
-    active.forEach(function(idx) { segs[idx].style.background = zoneColors[idx]; });
-  }
-  document.getElementById('modalHrBadge').textContent = d.hr_zone;
-  document.getElementById('modalHrBadge').style.background = d.hr_color;
-  document.getElementById('modalHrPct').textContent = d.hr_pct + ' HFmax';
+  // ── HR Zone bar ────────────────────────────────────────────
   var hrSection = document.getElementById('modalHrSection');
   hrSection.style.display = (d.hr_zone === '–') ? 'none' : 'block';
+  if (d.hr_zone !== '–') {
+    var hrBar = document.getElementById('modalHrBar');
+    var segs = hrBar.querySelectorAll('.hr-zone-seg');
+    var zoneColors = ['#1e6b2e','#27ae60','#f39c12','#e67e22','#e74c3c'];
+    var dimColors  = ['#0d2e14','#163d20','#2b1f00','#1e1000','#200000'];
+    segs.forEach(function(s,i){ s.style.background = dimColors[i]; });
+    var zoneMap = {'Zone 1':[0],'Zone 2':[1],'Zone 3':[2],'Zone 3–4':[2,3],'Zone 4':[3],'Zone 5':[4],'Zone 2–3':[1,2],'Zone 2–4':[1,2,3]};
+    var active = zoneMap[d.hr_zone] || [];
+    active.forEach(function(idx){ segs[idx].style.background = zoneColors[idx]; });
+    document.getElementById('modalHrBadge').textContent = d.hr_zone;
+    document.getElementById('modalHrBadge').style.background = d.hr_color;
+    document.getElementById('modalHrPct').textContent = d.hr_pct + ' HFmax';
 
-  // RPE track
-  var rpeTrack = document.getElementById('modalRpeTrack');
-  rpeTrack.innerHTML = '';
-  for (var i = 1; i <= 10; i++) {
-    var dot = document.createElement('div');
-    dot.className = 'rpe-dot';
-    var active_rpe = (i >= d.rpe_low && i <= d.rpe_high);
-    var rpe_color = i <= 3 ? '#27ae60' : i <= 5 ? '#f1c40f' : i <= 7 ? '#e67e22' : '#e74c3c';
-    dot.style.background = active_rpe ? rpe_color : '#1e2d3d';
-    rpeTrack.appendChild(dot);
+    // Per-zone BPM chips (only when max_hr is known)
+    var bpmRow = document.getElementById('modalHrBpmRow');
+    bpmRow.innerHTML = '';
+    if (d.max_hr) {
+      var h = d.max_hr;
+      var zNames = ['Z1','Z2','Z3','Z4','Z5'];
+      var zRanges = [
+        '<' + Math.round(h*0.60),
+        Math.round(h*0.60) + '–' + Math.round(h*0.70),
+        Math.round(h*0.70) + '–' + Math.round(h*0.80),
+        Math.round(h*0.80) + '–' + Math.round(h*0.90),
+        '>' + Math.round(h*0.90)
+      ];
+      active.forEach(function(idx) {
+        var chip = document.createElement('span');
+        chip.style.cssText = 'background:' + zoneColors[idx] + '22;border:1px solid ' + zoneColors[idx] + ';border-radius:20px;padding:3px 10px;font-size:.75em;color:' + zoneColors[idx];
+        chip.textContent = zNames[idx] + ': ' + zRanges[idx] + ' bpm';
+        bpmRow.appendChild(chip);
+      });
+    }
   }
-  document.getElementById('modalRpeLabel').textContent = d.rpe_label;
-  document.getElementById('modalRpeNum').textContent = 'RPE ' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10';
 
-  // Note
+  // ── RPE ────────────────────────────────────────────────────
+  var rpeSection = document.getElementById('modalRpeSection');
+  rpeSection.style.display = (d.rpe_high === 0) ? 'none' : 'block';
+  if (d.rpe_high > 0) {
+    var rpeTrack = document.getElementById('modalRpeTrack');
+    rpeTrack.innerHTML = '';
+    for (var i = 1; i <= 10; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'rpe-dot';
+      var on = (i >= d.rpe_low && i <= d.rpe_high);
+      dot.style.background = on ? (i<=3?'#27ae60':i<=5?'#f1c40f':i<=7?'#e67e22':'#e74c3c') : '#1e2d3d';
+      rpeTrack.appendChild(dot);
+    }
+    document.getElementById('modalRpeLabel').textContent = d.rpe_label;
+    document.getElementById('modalRpeNum').textContent = 'RPE ' + (d.rpe_low===d.rpe_high ? d.rpe_low : d.rpe_low+'–'+d.rpe_high) + ' / 10';
+  }
+
+  // ── Einheits-Struktur ──────────────────────────────────────
+  var structure = d.structure || [];
+  var structSection = document.getElementById('modalStructureSection');
+  structSection.style.display = structure.length ? 'block' : 'none';
+  document.getElementById('modalStructure').innerHTML = structure.map(function(s,i) {
+    return '<li style="font-size:.84em;padding:6px 0;border-bottom:1px solid #1e2d3d;color:#bdc3c7;list-style:none;display:flex;gap:8px"><span style="color:#f39c12;font-weight:700;flex-shrink:0">' + (i+1) + '.</span>' + s + '</li>';
+  }).join('');
+
+  // ── Note ───────────────────────────────────────────────────
   document.getElementById('modalNote').textContent = d.note;
 
-  // Tips
-  var tips = d.tips || [];
-  document.getElementById('modalTips').innerHTML = tips.map(function(t) {
+  // ── Ernährung ──────────────────────────────────────────────
+  var nutrition = d.nutrition || [];
+  var nutrSection = document.getElementById('modalNutritionSection');
+  nutrSection.style.display = nutrition.length ? 'block' : 'none';
+  document.getElementById('modalNutrition').innerHTML = nutrition.map(function(n) {
+    return '<li>' + n + '</li>';
+  }).join('');
+
+  // ── Tipps ──────────────────────────────────────────────────
+  document.getElementById('modalTips').innerHTML = (d.tips||[]).map(function(t) {
     return '<li>' + t + '</li>';
   }).join('');
 
   document.getElementById('dayModalOverlay').classList.add('open');
 }
 function closeDayModal(e) {
-  if (e.target === document.getElementById('dayModalOverlay')) {
+  if (e.target === document.getElementById('dayModalOverlay'))
     document.getElementById('dayModalOverlay').classList.remove('open');
-  }
 }
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') document.getElementById('dayModalOverlay').classList.remove('open');
@@ -673,7 +727,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Ruecksack einführen, Ausrüstung testen, Pace bewusst drosseln</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Mo", "date": "18.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Mobilität 20 min · Dehnen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Mo", "date": "18.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Mobilität 20 min · Dehnen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">18.03</span>
@@ -686,7 +740,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Di", "date": "19.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Rucksack 3 kg · Kadenz 180", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Di", "date": "19.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Rucksack 3 kg · Kadenz 180", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">19.03</span>
@@ -699,7 +753,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1200; border-top: 3px solid #e67e22; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Mi", "date": "20.03.2026", "type": "hills", "name": "Hügelläufe", "km": 10, "elev": 220, "note": "4 × 2 min bergauf · locker zurück", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Mi", "date": "20.03.2026", "type": "hills", "name": "Hügelläufe", "km": 10, "elev": 220, "note": "4 × 2 min bergauf · locker zurück", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "structure": ["10 min flach einlaufen", "Bergintervalle: laufen/marschieren bergauf", "Locker bergab (aktive Pause) · wiederholen"], "nutrition": ["KH-reich 2 h vorher", "Gel nach dem 2. Intervall", "Mehr trinken als normal – Anstrengung unterschätzt"], "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Power-Hiking bergauf = spart Energie für Wüste", "Bergab: Knie weich, keine Bremskraft", "HF bergauf kurz in Z4 – dann bergab erholen", "Marschtechnik mit Stöcken üben"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">20.03</span>
@@ -712,7 +766,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Do", "date": "21.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Yoga oder Foam-Roll", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Do", "date": "21.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Yoga oder Foam-Roll", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">21.03</span>
@@ -725,7 +779,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Fr", "date": "22.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 70, "note": "Sehr locker · Beine frei", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Fr", "date": "22.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 70, "note": "Sehr locker · Beine frei", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">22.03</span>
@@ -738,7 +792,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Sa", "date": "23.03.2026", "type": "long", "name": "Langer Lauf", "km": 18, "elev": 350, "note": "Rucksack 4 kg · 2 L Wasser · Wüstenpace", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "Sa", "date": "23.03.2026", "type": "long", "name": "Langer Lauf", "km": 18, "elev": 350, "note": "Rucksack 4 kg · 2 L Wasser · Wüstenpace", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">23.03</span>
@@ -751,7 +805,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#061a18; border-top: 3px solid #16a085; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "So", "date": "24.03.2026", "type": "active", "name": "Aktiv-Erholung", "km": 2, "elev": 30, "note": "Spaziergang · Dehnen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "tips": ["Spazieren, Schwimmen oder leichtes Radfahren", "Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung und Erholung", "Dehnen & Mobilität 20–30 min", "Früh schlafen gehen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 1, "weekFocus": "Basisaufbau", "weekColor": "#3498db", "d": "So", "date": "24.03.2026", "type": "active", "name": "Aktiv-Erholung", "km": 2, "elev": 30, "note": "Spaziergang · Dehnen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "structure": ["Spazieren, Schwimmen oder lockeres Radfahren", "30–60 min – kein Leistungsdruck", "Dehnen & Mobilität 20 min"], "nutrition": ["Normal essen – Regeneration braucht Nährstoffe", "Proteinreich für Muskelreparatur", "Ausreichend trinken"], "tips": ["Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung", "Schlaf priorisieren", "Körpersignale ernst nehmen", "Früh schlafen gehen"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">24.03</span>
@@ -780,7 +834,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Ernährungsstrategie testen, Hitzeanpassung starten (Sauna/warme Kleidung)</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Mo", "date": "25.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlaf priorisieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Mo", "date": "25.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlaf priorisieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">25.03</span>
@@ -793,7 +847,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Di", "date": "26.03.2026", "type": "easy", "name": "Easy Run", "km": 9, "elev": 100, "note": "Rucksack 4 kg · Gels testen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Di", "date": "26.03.2026", "type": "easy", "name": "Easy Run", "km": 9, "elev": 100, "note": "Rucksack 4 kg · Gels testen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">26.03</span>
@@ -806,7 +860,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1f00; border-top: 3px solid #f39c12; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Mi", "date": "27.03.2026", "type": "tempo", "name": "Tempolauf", "km": 12, "elev": 120, "note": "2 × 15 min bei 75 % HFmax", "icon": "⚡", "bar": "#f39c12", "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12", "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch", "tips": ["Aufwärmen: 15 min locker vor dem Tempo", "Tempoabschnitte nie überpacen", "Abkühlen: 10 min locker ausklingen lassen", "HF im Zielbereich halten – nicht überziehen", "KH-Versorgung während und nach dem Lauf"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Mi", "date": "27.03.2026", "type": "tempo", "name": "Tempolauf", "km": 12, "elev": 120, "note": "2 × 15 min bei 75 % HFmax", "icon": "⚡", "bar": "#f39c12", "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch", "structure": ["15 min locker einlaufen (Zone 1–2)", "Tempoabschnitte laut Plan (Zone 3–4)", "10–15 min locker auslaufen"], "nutrition": ["2 h vorher KH-reiche Mahlzeit", "Gel direkt nach dem letzten Tempoblock", "Viel trinken – auch vor dem Lauf"], "tips": ["Nie zu schnell beginnen – gleichmäßige Splits", "HF darf kurz in Z4, aber nicht dauerhaft", "Sätze: kurze Erholungspause zwischen Blöcken", "Abkühlen nicht weglassen", "Qualität vor Quantität"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">27.03</span>
@@ -819,7 +873,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Do", "date": "28.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Kontrastdusche / Eisbad", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Do", "date": "28.03.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Kontrastdusche / Eisbad", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">28.03</span>
@@ -832,7 +886,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Fr", "date": "29.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Sehr locker · Beine schütteln", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Fr", "date": "29.03.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Sehr locker · Beine schütteln", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">29.03</span>
@@ -845,7 +899,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Sa", "date": "30.03.2026", "type": "long", "name": "Langer Lauf", "km": 22, "elev": 500, "note": "Rucksack 5 kg · Hügelstrecke · volle Ernährung", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "Sa", "date": "30.03.2026", "type": "long", "name": "Langer Lauf", "km": 22, "elev": 500, "note": "Rucksack 5 kg · Hügelstrecke · volle Ernährung", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">30.03</span>
@@ -858,7 +912,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#061a18; border-top: 3px solid #16a085; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "So", "date": "31.03.2026", "type": "active", "name": "Aktiv-Erholung", "km": 0, "elev": 0, "note": "Schwimmen oder Spazieren · kein Laufen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "tips": ["Spazieren, Schwimmen oder leichtes Radfahren", "Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung und Erholung", "Dehnen & Mobilität 20–30 min", "Früh schlafen gehen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 2, "weekFocus": "Ausdauer", "weekColor": "#2980b9", "d": "So", "date": "31.03.2026", "type": "active", "name": "Aktiv-Erholung", "km": 0, "elev": 0, "note": "Schwimmen oder Spazieren · kein Laufen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "structure": ["Spazieren, Schwimmen oder lockeres Radfahren", "30–60 min – kein Leistungsdruck", "Dehnen & Mobilität 20 min"], "nutrition": ["Normal essen – Regeneration braucht Nährstoffe", "Proteinreich für Muskelreparatur", "Ausreichend trinken"], "tips": ["Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung", "Schlaf priorisieren", "Körpersignale ernst nehmen", "Früh schlafen gehen"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">31.03</span>
@@ -887,7 +941,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Erster Back-to-Back am Wochenende – Sonntag bewusst müde laufen!</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Mo", "date": "01.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlaf · Ernährung", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Mo", "date": "01.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlaf · Ernährung", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">01.04</span>
@@ -900,7 +954,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Di", "date": "02.04.2026", "type": "easy", "name": "Easy Run", "km": 10, "elev": 100, "note": "Locker · lockerer Schritt", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Di", "date": "02.04.2026", "type": "easy", "name": "Easy Run", "km": 10, "elev": 100, "note": "Locker · lockerer Schritt", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">02.04</span>
@@ -913,7 +967,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1200; border-top: 3px solid #e67e22; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Mi", "date": "03.04.2026", "type": "hills", "name": "Bergintervals", "km": 12, "elev": 350, "note": "6 × 200 hm bergauf · Marschtechnik bergab", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Mi", "date": "03.04.2026", "type": "hills", "name": "Bergintervals", "km": 12, "elev": 350, "note": "6 × 200 hm bergauf · Marschtechnik bergab", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "structure": ["10 min flach einlaufen", "Bergintervalle: laufen/marschieren bergauf", "Locker bergab (aktive Pause) · wiederholen"], "nutrition": ["KH-reich 2 h vorher", "Gel nach dem 2. Intervall", "Mehr trinken als normal – Anstrengung unterschätzt"], "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Power-Hiking bergauf = spart Energie für Wüste", "Bergab: Knie weich, keine Bremskraft", "HF bergauf kurz in Z4 – dann bergab erholen", "Marschtechnik mit Stöcken üben"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">03.04</span>
@@ -926,7 +980,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Do", "date": "04.04.2026", "type": "easy", "name": "Recovery Run", "km": 8, "elev": 80, "note": "Sehr locker · keine Intensität", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Do", "date": "04.04.2026", "type": "easy", "name": "Recovery Run", "km": 8, "elev": 80, "note": "Sehr locker · keine Intensität", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">04.04</span>
@@ -939,7 +993,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Fr", "date": "05.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Füße pflegen · schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Fr", "date": "05.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Füße pflegen · schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">05.04</span>
@@ -952,7 +1006,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Sa", "date": "06.04.2026", "type": "long", "name": "Langer Lauf", "km": 22, "elev": 480, "note": "Rucksack 6 kg · Mittagshitze testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "Sa", "date": "06.04.2026", "type": "long", "name": "Langer Lauf", "km": 22, "elev": 480, "note": "Rucksack 6 kg · Mittagshitze testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">06.04</span>
@@ -965,7 +1019,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1e0a2b; border-top: 3px solid #8e44ad; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "So", "date": "07.04.2026", "type": "b2b", "name": "Back-to-Back #1", "km": 6, "elev": 80, "note": "Erster B2B! Sehr locker · müde Beine akzeptieren", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "tips": ["Ziel: Laufen auf müden Beinen – nicht Pace!", "Keine neuen Schuhe oder Ausrüstung testen", "Zwischen Tag 1 und 2: gut essen, Beine kühlen", "HF kann höher sein als normal – das ist okay", "Recovery-Protokoll nach dem Lauf konsequent"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 3, "weekFocus": "Intensität", "weekColor": "#e67e22", "d": "So", "date": "07.04.2026", "type": "b2b", "name": "Back-to-Back #1", "km": 6, "elev": 80, "note": "Erster B2B! Sehr locker · müde Beine akzeptieren", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "structure": ["Locker einlaufen (egal wie lange es dauert)", "Hauptteil: Wüstenpace – Pace unwichtig", "Auslaufen + sofortige Recovery-Maßnahmen"], "nutrition": ["Abends vorher: max. KH-Aufnahme", "Morgens: KH + etwas Protein", "Gel alle 40 min – HF-gesteuertes Tempo", "Sofort nach Ziel: Protein-Shake + Salz"], "tips": ["Ziel ist Laufen auf müden Beinen – nicht Pace!", "HF wird höher als normal sein – das ist okay", "Keine neuen Schuhe oder Ausrüstung", "Zwischen Tag 1 und 2: Beine kühlen/hochlegen", "Recovery-Protokoll sofort nach Ankunft"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">07.04</span>
@@ -994,7 +1048,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Erholungswoche – Qualität vor Quantität, Körper adaptiert jetzt</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Mo", "date": "08.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Massage oder Physio", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Mo", "date": "08.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Massage oder Physio", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">08.04</span>
@@ -1007,7 +1061,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Di", "date": "09.04.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 70, "note": "Sehr locker · kein Druck", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Di", "date": "09.04.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 70, "note": "Sehr locker · kein Druck", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">09.04</span>
@@ -1020,7 +1074,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Mi", "date": "10.04.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 120, "note": "Lockere Hügel · Technik", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Mi", "date": "10.04.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 120, "note": "Lockere Hügel · Technik", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">10.04</span>
@@ -1033,7 +1087,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Do", "date": "11.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ernährung · Schlaf 8+ h", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Do", "date": "11.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ernährung · Schlaf 8+ h", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">11.04</span>
@@ -1046,7 +1100,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Fr", "date": "12.04.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 60, "note": "Locker · Ausrüstung prüfen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Fr", "date": "12.04.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 60, "note": "Locker · Ausrüstung prüfen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">12.04</span>
@@ -1059,7 +1113,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Sa", "date": "13.04.2026", "type": "long", "name": "Medium Long Run", "km": 15, "elev": 280, "note": "Entspannt · Race-Pace testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "Sa", "date": "13.04.2026", "type": "long", "name": "Medium Long Run", "km": 15, "elev": 280, "note": "Entspannt · Race-Pace testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">13.04</span>
@@ -1072,7 +1126,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "So", "date": "14.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Passiv erholen · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 4, "weekFocus": "Entlastung", "weekColor": "#27ae60", "d": "So", "date": "14.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Passiv erholen · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">14.04</span>
@@ -1101,7 +1155,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Wochenende = Race-Simulation: Rucksack komplett bepackt, voller Gear-Test</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Mo", "date": "15.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Vorbereitung Wochenend-Block", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Mo", "date": "15.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Vorbereitung Wochenend-Block", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">15.04</span>
@@ -1114,7 +1168,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Di", "date": "16.04.2026", "type": "easy", "name": "Easy Run", "km": 9, "elev": 90, "note": "Rucksack 6 kg · locker", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Di", "date": "16.04.2026", "type": "easy", "name": "Easy Run", "km": 9, "elev": 90, "note": "Rucksack 6 kg · locker", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">16.04</span>
@@ -1127,7 +1181,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1200; border-top: 3px solid #e67e22; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Mi", "date": "17.04.2026", "type": "hills", "name": "Wüsten-Spezial", "km": 11, "elev": 300, "note": "Langer Bergabschnitt + Aufstieg · Sandtechnik", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Mi", "date": "17.04.2026", "type": "hills", "name": "Wüsten-Spezial", "km": 11, "elev": 300, "note": "Langer Bergabschnitt + Aufstieg · Sandtechnik", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "structure": ["10 min flach einlaufen", "Bergintervalle: laufen/marschieren bergauf", "Locker bergab (aktive Pause) · wiederholen"], "nutrition": ["KH-reich 2 h vorher", "Gel nach dem 2. Intervall", "Mehr trinken als normal – Anstrengung unterschätzt"], "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Power-Hiking bergauf = spart Energie für Wüste", "Bergab: Knie weich, keine Bremskraft", "HF bergauf kurz in Z4 – dann bergab erholen", "Marschtechnik mit Stöcken üben"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">17.04</span>
@@ -1140,7 +1194,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Do", "date": "18.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Beine schonen vor B2B-WE", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Do", "date": "18.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Beine schonen vor B2B-WE", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">18.04</span>
@@ -1153,7 +1207,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Fr", "date": "19.04.2026", "type": "easy", "name": "Aktivierung", "km": 7, "elev": 80, "note": "Locker · Darmstadium vorbereiten", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Fr", "date": "19.04.2026", "type": "easy", "name": "Aktivierung", "km": 7, "elev": 80, "note": "Locker · Darmstadium vorbereiten", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">19.04</span>
@@ -1166,7 +1220,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Sa", "date": "20.04.2026", "type": "long", "name": "Race-Simulation 1", "km": 19, "elev": 450, "note": "Rucksack 7–8 kg · Mittagshitze · volle Race-Ernährung", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "Sa", "date": "20.04.2026", "type": "long", "name": "Race-Simulation 1", "km": 19, "elev": 450, "note": "Rucksack 7–8 kg · Mittagshitze · volle Race-Ernährung", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">20.04</span>
@@ -1179,7 +1233,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1e0a2b; border-top: 3px solid #8e44ad; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "So", "date": "21.04.2026", "type": "b2b", "name": "Back-to-Back #2", "km": 16, "elev": 270, "note": "Müde Beine! Pace egal · durchbeißen", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "tips": ["Ziel: Laufen auf müden Beinen – nicht Pace!", "Keine neuen Schuhe oder Ausrüstung testen", "Zwischen Tag 1 und 2: gut essen, Beine kühlen", "HF kann höher sein als normal – das ist okay", "Recovery-Protokoll nach dem Lauf konsequent"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 5, "weekFocus": "Spezifisch", "weekColor": "#8e44ad", "d": "So", "date": "21.04.2026", "type": "b2b", "name": "Back-to-Back #2", "km": 16, "elev": 270, "note": "Müde Beine! Pace egal · durchbeißen", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "structure": ["Locker einlaufen (egal wie lange es dauert)", "Hauptteil: Wüstenpace – Pace unwichtig", "Auslaufen + sofortige Recovery-Maßnahmen"], "nutrition": ["Abends vorher: max. KH-Aufnahme", "Morgens: KH + etwas Protein", "Gel alle 40 min – HF-gesteuertes Tempo", "Sofort nach Ziel: Protein-Shake + Salz"], "tips": ["Ziel ist Laufen auf müden Beinen – nicht Pace!", "HF wird höher als normal sein – das ist okay", "Keine neuen Schuhe oder Ausrüstung", "Zwischen Tag 1 und 2: Beine kühlen/hochlegen", "Recovery-Protokoll sofort nach Ankunft"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">21.04</span>
@@ -1208,7 +1262,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Härteste Woche – mentale Stärke trainieren, Schmerz als Info werten</div>
       <div class="week-days">
         <div class="day-cell" style="background:#061a18; border-top: 3px solid #16a085; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Mo", "date": "22.04.2026", "type": "active", "name": "Aktiv-Erholung", "km": 0, "elev": 0, "note": "Spazieren · Beine hochlegen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "tips": ["Spazieren, Schwimmen oder leichtes Radfahren", "Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung und Erholung", "Dehnen & Mobilität 20–30 min", "Früh schlafen gehen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Mo", "date": "22.04.2026", "type": "active", "name": "Aktiv-Erholung", "km": 0, "elev": 0, "note": "Spazieren · Beine hochlegen", "icon": "🌿", "bar": "#16a085", "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung", "structure": ["Spazieren, Schwimmen oder lockeres Radfahren", "30–60 min – kein Leistungsdruck", "Dehnen & Mobilität 20 min"], "nutrition": ["Normal essen – Regeneration braucht Nährstoffe", "Proteinreich für Muskelreparatur", "Ausreichend trinken"], "tips": ["Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung", "Schlaf priorisieren", "Körpersignale ernst nehmen", "Früh schlafen gehen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">22.04</span>
@@ -1221,7 +1275,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Di", "date": "23.04.2026", "type": "easy", "name": "Easy Run", "km": 10, "elev": 120, "note": "Rucksack 6 kg · locker", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Di", "date": "23.04.2026", "type": "easy", "name": "Easy Run", "km": 10, "elev": 120, "note": "Rucksack 6 kg · locker", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">23.04</span>
@@ -1234,7 +1288,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1200; border-top: 3px solid #e67e22; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Mi", "date": "24.04.2026", "type": "hills", "name": "Bergintervals", "km": 12, "elev": 350, "note": "Schwere Beine tolerieren · Technik", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Mi", "date": "24.04.2026", "type": "hills", "name": "Bergintervals", "km": 12, "elev": 350, "note": "Schwere Beine tolerieren · Technik", "icon": "⛰️", "bar": "#e67e22", "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab", "structure": ["10 min flach einlaufen", "Bergintervalle: laufen/marschieren bergauf", "Locker bergab (aktive Pause) · wiederholen"], "nutrition": ["KH-reich 2 h vorher", "Gel nach dem 2. Intervall", "Mehr trinken als normal – Anstrengung unterschätzt"], "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Power-Hiking bergauf = spart Energie für Wüste", "Bergab: Knie weich, keine Bremskraft", "HF bergauf kurz in Z4 – dann bergab erholen", "Marschtechnik mit Stöcken üben"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">24.04</span>
@@ -1247,7 +1301,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Do", "date": "25.04.2026", "type": "easy", "name": "Recovery Run", "km": 7, "elev": 80, "note": "Sehr locker · mentale Vorbereitung", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Do", "date": "25.04.2026", "type": "easy", "name": "Recovery Run", "km": 7, "elev": 80, "note": "Sehr locker · mentale Vorbereitung", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">25.04</span>
@@ -1260,7 +1314,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Fr", "date": "26.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlafen · Ernährung optimieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Fr", "date": "26.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Schlafen · Ernährung optimieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">26.04</span>
@@ -1273,7 +1327,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Sa", "date": "27.04.2026", "type": "long", "name": "Race-Simulation 2", "km": 22, "elev": 500, "note": "Tag 1 Etappe! Komplett ausgerüstet · Start 06:00 Uhr", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "Sa", "date": "27.04.2026", "type": "long", "name": "Race-Simulation 2", "km": 22, "elev": 500, "note": "Tag 1 Etappe! Komplett ausgerüstet · Start 06:00 Uhr", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">27.04</span>
@@ -1286,7 +1340,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1e0a2b; border-top: 3px solid #8e44ad; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "So", "date": "28.04.2026", "type": "b2b", "name": "Back-to-Back #3", "km": 18, "elev": 350, "note": "Tag 2 Etappe! Kompletter Race-Mode · kein Abkürzen", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "tips": ["Ziel: Laufen auf müden Beinen – nicht Pace!", "Keine neuen Schuhe oder Ausrüstung testen", "Zwischen Tag 1 und 2: gut essen, Beine kühlen", "HF kann höher sein als normal – das ist okay", "Recovery-Protokoll nach dem Lauf konsequent"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 6, "weekFocus": "Peak", "weekColor": "#e74c3c", "d": "So", "date": "28.04.2026", "type": "b2b", "name": "Back-to-Back #3", "km": 18, "elev": 350, "note": "Tag 2 Etappe! Kompletter Race-Mode · kein Abkürzen", "icon": "🔥", "bar": "#8e44ad", "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren", "structure": ["Locker einlaufen (egal wie lange es dauert)", "Hauptteil: Wüstenpace – Pace unwichtig", "Auslaufen + sofortige Recovery-Maßnahmen"], "nutrition": ["Abends vorher: max. KH-Aufnahme", "Morgens: KH + etwas Protein", "Gel alle 40 min – HF-gesteuertes Tempo", "Sofort nach Ziel: Protein-Shake + Salz"], "tips": ["Ziel ist Laufen auf müden Beinen – nicht Pace!", "HF wird höher als normal sein – das ist okay", "Keine neuen Schuhe oder Ausrüstung", "Zwischen Tag 1 und 2: Beine kühlen/hochlegen", "Recovery-Protokoll sofort nach Ankunft"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">28.04</span>
@@ -1315,7 +1369,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Umfang runter, Intensität kurz halten – Ausrüstung finalisieren</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Mo", "date": "29.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Erholen · Physio falls nötig", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Mo", "date": "29.04.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Erholen · Physio falls nötig", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">29.04</span>
@@ -1328,7 +1382,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Di", "date": "30.04.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Locker · Körpergefühl", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Di", "date": "30.04.2026", "type": "easy", "name": "Easy Run", "km": 8, "elev": 80, "note": "Locker · Körpergefühl", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">30.04</span>
@@ -1341,7 +1395,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b1f00; border-top: 3px solid #f39c12; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Mi", "date": "01.05.2026", "type": "tempo", "name": "Kurztempo", "km": 10, "elev": 120, "note": "2 × 10 min Tempo · Beine erinnern", "icon": "⚡", "bar": "#f39c12", "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12", "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch", "tips": ["Aufwärmen: 15 min locker vor dem Tempo", "Tempoabschnitte nie überpacen", "Abkühlen: 10 min locker ausklingen lassen", "HF im Zielbereich halten – nicht überziehen", "KH-Versorgung während und nach dem Lauf"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Mi", "date": "01.05.2026", "type": "tempo", "name": "Kurztempo", "km": 10, "elev": 120, "note": "2 × 10 min Tempo · Beine erinnern", "icon": "⚡", "bar": "#f39c12", "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch", "structure": ["15 min locker einlaufen (Zone 1–2)", "Tempoabschnitte laut Plan (Zone 3–4)", "10–15 min locker auslaufen"], "nutrition": ["2 h vorher KH-reiche Mahlzeit", "Gel direkt nach dem letzten Tempoblock", "Viel trinken – auch vor dem Lauf"], "tips": ["Nie zu schnell beginnen – gleichmäßige Splits", "HF darf kurz in Z4, aber nicht dauerhaft", "Sätze: kurze Erholungspause zwischen Blöcken", "Abkühlen nicht weglassen", "Qualität vor Quantität"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">01.05</span>
@@ -1354,7 +1408,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Do", "date": "02.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Packliste abhaken", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Do", "date": "02.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Packliste abhaken", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">02.05</span>
@@ -1367,7 +1421,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Fr", "date": "03.05.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 70, "note": "Rucksack 4 kg · letzter Gear-Check", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Fr", "date": "03.05.2026", "type": "easy", "name": "Easy Run", "km": 7, "elev": 70, "note": "Rucksack 4 kg · letzter Gear-Check", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">03.05</span>
@@ -1380,7 +1434,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0a1f3d; border-top: 3px solid #2980b9; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Sa", "date": "04.05.2026", "type": "long", "name": "Medium Long Run", "km": 15, "elev": 380, "note": "Wüstenpace · Ausrüstung vollständig testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "Sa", "date": "04.05.2026", "type": "long", "name": "Medium Long Run", "km": 15, "elev": 380, "note": "Wüstenpace · Ausrüstung vollständig testen", "icon": "🔵", "bar": "#2980b9", "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig", "structure": ["Erste 20 % bewusst sehr locker (Zone 1–2)", "Hauptteil stabil in Zone 2–3 halten", "Letztes Viertel: leicht steigern falls Kraft da"], "nutrition": ["KH vorladen am Abend vorher", "Gel/Riegel alle 45 min – auch ohne Hunger!", "500 ml/h Wasser · Salztabletten ab 2 h", "Nach dem Lauf: Protein + KH innerhalb 30 min"], "tips": ["Pace egal – HF entscheidet", "Rucksack vollständig bepackt wie im Rennen", "Ernährungsstrategie konsequent testen", "Mentale Stärke trainieren: Kopfkino positiv", "Blasen-Prävention: Leukoplast präventiv"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">04.05</span>
@@ -1393,7 +1447,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "So", "date": "05.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Vollständige Ruhe · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 7, "weekFocus": "Tapering", "weekColor": "#16a085", "d": "So", "date": "05.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Vollständige Ruhe · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">05.05</span>
@@ -1422,7 +1476,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">Beine frisch halten – niemals neue Schuhe oder Ausrüstung ausprobieren!</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Mo", "date": "06.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ausrüstung packen · Rucksack wiegen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Mo", "date": "06.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ausrüstung packen · Rucksack wiegen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">06.05</span>
@@ -1435,7 +1489,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Di", "date": "07.05.2026", "type": "easy", "name": "Easy Run", "km": 6, "elev": 60, "note": "Sehr locker · 30 min max", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Di", "date": "07.05.2026", "type": "easy", "name": "Easy Run", "km": 6, "elev": 60, "note": "Sehr locker · 30 min max", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">07.05</span>
@@ -1448,7 +1502,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Mi", "date": "08.05.2026", "type": "easy", "name": "Easy Run", "km": 5, "elev": 50, "note": "Locker · Beine freihalten", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Mi", "date": "08.05.2026", "type": "easy", "name": "Easy Run", "km": 5, "elev": 50, "note": "Locker · Beine freihalten", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">08.05</span>
@@ -1461,7 +1515,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Do", "date": "09.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Mentale Vorbereitung · Visualisieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Do", "date": "09.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Mentale Vorbereitung · Visualisieren", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">09.05</span>
@@ -1474,7 +1528,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Fr", "date": "10.05.2026", "type": "easy", "name": "Aktivierung", "km": 5, "elev": 70, "note": "20 min locker · kein Stress", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Fr", "date": "10.05.2026", "type": "easy", "name": "Aktivierung", "km": 5, "elev": 70, "note": "20 min locker · kein Stress", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">10.05</span>
@@ -1487,7 +1541,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Sa", "date": "11.05.2026", "type": "easy", "name": "Letzter Lauf", "km": 6, "elev": 80, "note": "30 min Aktivierung · alles gut fühlen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "Sa", "date": "11.05.2026", "type": "easy", "name": "Letzter Lauf", "km": 6, "elev": 80, "note": "30 min Aktivierung · alles gut fühlen", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">11.05</span>
@@ -1500,7 +1554,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "So", "date": "12.05.2026", "type": "rest", "name": "Reise-Vorbereitung", "km": 0, "elev": 0, "note": "Früh schlafen · An-/Abreise planen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 8, "weekFocus": "Finaler Taper", "weekColor": "#95a5a6", "d": "So", "date": "12.05.2026", "type": "rest", "name": "Reise-Vorbereitung", "km": 0, "elev": 0, "note": "Früh schlafen · An-/Abreise planen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">12.05</span>
@@ -1529,7 +1583,7 @@ document.addEventListener('keydown', function(e) {
       <div class="week-note">GPX-Route: 129.7 km · ▲ 1553 m · 18.–22. Mai 2026 · Solo Unsupported</div>
       <div class="week-days">
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Mo", "date": "11.05.2026", "type": "rest", "name": "Anreisetag", "km": 0, "elev": 0, "note": "Anreise Tabernas · Akklimatisierung", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Mo", "date": "11.05.2026", "type": "rest", "name": "Anreisetag", "km": 0, "elev": 0, "note": "Anreise Tabernas · Akklimatisierung", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mo</span>
             <span class="day-date-num">11.05</span>
@@ -1542,7 +1596,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Di", "date": "12.05.2026", "type": "easy", "name": "Kurze Aktivierung", "km": 4, "elev": 40, "note": "20 min locker · letzte Ausrüstungs-Checks", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Di", "date": "12.05.2026", "type": "easy", "name": "Kurze Aktivierung", "km": 4, "elev": 40, "note": "20 min locker · letzte Ausrüstungs-Checks", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Di</span>
             <span class="day-date-num">12.05</span>
@@ -1555,7 +1609,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Mi", "date": "13.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ausruhen · gut essen · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Mi", "date": "13.05.2026", "type": "rest", "name": "Ruhetag", "km": 0, "elev": 0, "note": "Ausruhen · gut essen · früh schlafen", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Mi</span>
             <span class="day-date-num">13.05</span>
@@ -1568,7 +1622,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#0d2818; border-top: 3px solid #27ae60; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Do", "date": "14.05.2026", "type": "easy", "name": "Aktivierung", "km": 3, "elev": 30, "note": "15 min locker · kein Stress", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Do", "date": "14.05.2026", "type": "easy", "name": "Aktivierung", "km": 3, "elev": 30, "note": "15 min locker · kein Stress", "icon": "🟢", "bar": "#27ae60", "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich", "structure": ["10 min einlaufen (sehr locker)", "Hauptteil gleichmäßig in Zone 2", "5–10 min auslaufen + Dehnen"], "nutrition": ["1–2 h vorher leichte KH (Banane, Toast)", "Ab 60 min: 1 Gel oder KH-Riegel", "500 ml Wasser/h · danach Protein"], "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "HF im Blick – nicht in Zone 3 driften"]}'>
           <div class="day-header">
             <span class="day-name">Do</span>
             <span class="day-date-num">14.05</span>
@@ -1581,7 +1635,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#1a2633; border-top: 3px solid #2c3e50; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Fr", "date": "15.05.2026", "type": "rest", "name": "Race-Briefing", "km": 0, "elev": 0, "note": "Letzte Vorbereitung · Schlafen!", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Fr", "date": "15.05.2026", "type": "rest", "name": "Race-Briefing", "km": 0, "elev": 0, "note": "Letzte Vorbereitung · Schlafen!", "icon": "😴", "bar": "#2c3e50", "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung", "structure": ["Kein Training", "Aktive Regeneration falls gewünscht", "Schlaf 8–9 h"], "nutrition": ["Proteinreich essen für Muskelreparatur", "Ausreichend trinken (2–3 L)", "Kohlenhydrate moderat – kein Überladen nötig"], "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"]}'>
           <div class="day-header">
             <span class="day-name">Fr</span>
             <span class="day-date-num">15.05</span>
@@ -1594,7 +1648,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b0000; border-top: 3px solid #e74c3c; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Sa", "date": "16.05.2026", "type": "race", "name": "RENNEN TAG 1", "km": 32.3, "elev": 416, "note": "Etappe 1: 32.3 km · ▲ 416 m · Start 06:00", "icon": "🏁", "bar": "#e74c3c", "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag", "tips": ["Früh starten (06:00) – Hitze meiden", "Siesta 12:00–15:00 Uhr strikt einhalten", "Wasser immer auf > 1,5 L auffüllen", "Ernährung alle 45 min – auch ohne Hunger", "Blasen sofort mit Leukoplast versorgen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "Sa", "date": "16.05.2026", "type": "race", "name": "RENNEN TAG 1", "km": 32.3, "elev": 416, "note": "Etappe 1: 32.3 km · ▲ 416 m · Start 06:00", "icon": "🏁", "bar": "#e74c3c", "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag", "structure": ["Start 06:00 – erste 10 km bewusst locker", "Mittelteil stabil in Zone 2–3", "Siesta 12–15 Uhr · dann Abendmarsch"], "nutrition": ["Vorher: großes KH-Frühstück 2 h vor Start", "Gel alle 40–45 min während des Laufens", "Wasser nie unter 1,5 L · Salztabletten", "In Siesta: Mahlzeit + Schlaf wenn möglich"], "tips": ["Früh starten – Hitze meiden", "Siesta 12–15 Uhr strikt einhalten", "Wasser immer > 1,5 L nachfüllen", "Blasen sofort mit Leukoplast versorgen", "Navigation: GPX offline + Backup"]}'>
           <div class="day-header">
             <span class="day-name">Sa</span>
             <span class="day-date-num">16.05</span>
@@ -1607,7 +1661,7 @@ document.addEventListener('keydown', function(e) {
           <div class="day-detail-hint">Details ansehen →</div>
         </div>
         <div class="day-cell" style="background:#2b0000; border-top: 3px solid #e74c3c; cursor:pointer"
-             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "So", "date": "17.05.2026", "type": "race", "name": "RENNEN TAG 2", "km": 32.1, "elev": 251, "note": "Etappe 2: 32.1 km · ▲ 251 m · Start 06:00", "icon": "🏁", "bar": "#e74c3c", "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c", "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag", "tips": ["Früh starten (06:00) – Hitze meiden", "Siesta 12:00–15:00 Uhr strikt einhalten", "Wasser immer auf > 1,5 L auffüllen", "Ernährung alle 45 min – auch ohne Hunger", "Blasen sofort mit Leukoplast versorgen"]}'>
+             onclick="openDayModal(this)" data-day='{"weekNum": 9, "weekFocus": "Race Week", "weekColor": "#c0392b", "d": "So", "date": "17.05.2026", "type": "race", "name": "RENNEN TAG 2", "km": 32.1, "elev": 251, "note": "Etappe 2: 32.1 km · ▲ 251 m · Start 06:00", "icon": "🏁", "bar": "#e74c3c", "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c", "hr_bpm": "–", "pace_target": "–", "max_hr": null, "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag", "structure": ["Start 06:00 – erste 10 km bewusst locker", "Mittelteil stabil in Zone 2–3", "Siesta 12–15 Uhr · dann Abendmarsch"], "nutrition": ["Vorher: großes KH-Frühstück 2 h vor Start", "Gel alle 40–45 min während des Laufens", "Wasser nie unter 1,5 L · Salztabletten", "In Siesta: Mahlzeit + Schlaf wenn möglich"], "tips": ["Früh starten – Hitze meiden", "Siesta 12–15 Uhr strikt einhalten", "Wasser immer > 1,5 L nachfüllen", "Blasen sofort mit Leukoplast versorgen", "Navigation: GPX offline + Backup"]}'>
           <div class="day-header">
             <span class="day-name">So</span>
             <span class="day-date-num">17.05</span>
