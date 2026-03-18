@@ -31,113 +31,113 @@ WEEKS_TO_RACE = max(1, (RACE_DATE - TODAY).days // 7)
 WEEKLY_PLAN = [
     {
         "num": 1, "focus": "Basisaufbau", "color": "#3498db",
-        "total_km": 46, "total_elev": 750,
+        "total_km": 50, "total_elev": 820,
         "note": "Ruecksack einführen, Ausrüstung testen, Pace bewusst drosseln",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Mobilität 20 min · Dehnen"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 80,  "note": "Rucksack 3 kg · Kadenz 180"},
-            {"d": "Mi", "type": "hills",  "name": "Hügelläufe",       "km": 10, "elev": 220, "note": "4 × 2 min bergauf · locker zurück"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 90,  "note": "Rucksack 3 kg · Kadenz 180"},
+            {"d": "Mi", "type": "hills",  "name": "Hügelläufe",       "km": 11, "elev": 250, "note": "4 × 2 min bergauf · locker zurück"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Yoga oder Foam-Roll"},
-            {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 70,  "note": "Sehr locker · Beine frei"},
-            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 18, "elev": 350, "note": "Rucksack 4 kg · 2 L Wasser · Wüstenpace"},
-            {"d": "So", "type": "active", "name": "Aktiv-Erholung",   "km": 2,  "elev": 30,  "note": "Spaziergang · Dehnen"},
+            {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 80,  "note": "Sehr locker · Beine frei"},
+            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 21, "elev": 400, "note": "Rucksack 4 kg · 2 L Wasser · Wüstenpace"},
+            {"d": "So", "type": "active", "name": "Aktiv-Erholung",   "km": 0,  "elev": 0,   "note": "Spaziergang · Dehnen"},
         ],
     },
     {
         "num": 2, "focus": "Ausdauer", "color": "#2980b9",
-        "total_km": 51, "total_elev": 870,
+        "total_km": 56, "total_elev": 960,
         "note": "Ernährungsstrategie testen, Hitzeanpassung starten (Sauna/warme Kleidung)",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Schlaf priorisieren"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 100, "note": "Rucksack 4 kg · Gels testen"},
-            {"d": "Mi", "type": "tempo",  "name": "Tempolauf",        "km": 12, "elev": 120, "note": "2 × 15 min bei 75 % HFmax"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 10, "elev": 110, "note": "Rucksack 4 kg · Gels testen"},
+            {"d": "Mi", "type": "tempo",  "name": "Tempolauf",        "km": 13, "elev": 130, "note": "2 × 15 min bei 75 % HFmax"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Kontrastdusche / Eisbad"},
-            {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 80,  "note": "Sehr locker · Beine schütteln"},
-            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 22, "elev": 500, "note": "Rucksack 5 kg · Hügelstrecke · volle Ernährung"},
+            {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 90,  "note": "Sehr locker · Beine schütteln"},
+            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 24, "elev": 560, "note": "Rucksack 5 kg · Hügelstrecke · volle Ernährung"},
             {"d": "So", "type": "active", "name": "Aktiv-Erholung",   "km": 0,  "elev": 0,   "note": "Schwimmen oder Spazieren · kein Laufen"},
         ],
     },
     {
         "num": 3, "focus": "Intensität", "color": "#e67e22",
-        "total_km": 58, "total_elev": 1090,
+        "total_km": 64, "total_elev": 1210,
         "note": "Erster Back-to-Back am Wochenende – Sonntag bewusst müde laufen!",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Schlaf · Ernährung"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 10, "elev": 100, "note": "Locker · lockerer Schritt"},
-            {"d": "Mi", "type": "hills",  "name": "Bergintervals",    "km": 12, "elev": 350, "note": "6 × 200 hm bergauf · Marschtechnik bergab"},
-            {"d": "Do", "type": "easy",   "name": "Recovery Run",     "km": 8,  "elev": 80,  "note": "Sehr locker · keine Intensität"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 11, "elev": 110, "note": "Locker · lockerer Schritt"},
+            {"d": "Mi", "type": "hills",  "name": "Bergintervals",    "km": 13, "elev": 380, "note": "6 × 200 hm bergauf · Marschtechnik bergab"},
+            {"d": "Do", "type": "easy",   "name": "Recovery Run",     "km": 9,  "elev": 90,  "note": "Sehr locker · keine Intensität"},
             {"d": "Fr", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Füße pflegen · schlafen"},
-            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 22, "elev": 480, "note": "Rucksack 6 kg · Mittagshitze testen"},
-            {"d": "So", "type": "b2b",    "name": "Back-to-Back #1",  "km": 6,  "elev": 80,  "note": "Erster B2B! Sehr locker · müde Beine akzeptieren"},
+            {"d": "Sa", "type": "long",   "name": "Langer Lauf",      "km": 24, "elev": 540, "note": "Rucksack 6 kg · Mittagshitze testen"},
+            {"d": "So", "type": "b2b",    "name": "Back-to-Back #1",  "km": 7,  "elev": 90,  "note": "Erster B2B! Sehr locker · müde Beine akzeptieren"},
         ],
     },
     {
         "num": 4, "focus": "Entlastung", "color": "#27ae60",
-        "total_km": 37, "total_elev": 530,
+        "total_km": 40, "total_elev": 580,
         "note": "Erholungswoche – Qualität vor Quantität, Körper adaptiert jetzt",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Massage oder Physio"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 7,  "elev": 70,  "note": "Sehr locker · kein Druck"},
-            {"d": "Mi", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 120, "note": "Lockere Hügel · Technik"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 80,  "note": "Sehr locker · kein Druck"},
+            {"d": "Mi", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 130, "note": "Lockere Hügel · Technik"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Ernährung · Schlaf 8+ h"},
             {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 7,  "elev": 60,  "note": "Locker · Ausrüstung prüfen"},
-            {"d": "Sa", "type": "long",   "name": "Medium Long Run",  "km": 15, "elev": 280, "note": "Entspannt · Race-Pace testen"},
+            {"d": "Sa", "type": "long",   "name": "Medium Long Run",  "km": 16, "elev": 310, "note": "Entspannt · Race-Pace testen"},
             {"d": "So", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Passiv erholen · früh schlafen"},
         ],
     },
     {
         "num": 5, "focus": "Spezifisch", "color": "#8e44ad",
-        "total_km": 62, "total_elev": 1190,
+        "total_km": 68, "total_elev": 1320,
         "note": "Wochenende = Race-Simulation: Rucksack komplett bepackt, voller Gear-Test",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Vorbereitung Wochenend-Block"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 90,  "note": "Rucksack 6 kg · locker"},
-            {"d": "Mi", "type": "hills",  "name": "Wüsten-Spezial",   "km": 11, "elev": 300, "note": "Langer Bergabschnitt + Aufstieg · Sandtechnik"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 10, "elev": 100, "note": "Rucksack 6 kg · locker"},
+            {"d": "Mi", "type": "hills",  "name": "Wüsten-Spezial",   "km": 12, "elev": 330, "note": "Langer Bergabschnitt + Aufstieg · Sandtechnik"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Beine schonen vor B2B-WE"},
-            {"d": "Fr", "type": "easy",   "name": "Aktivierung",      "km": 7,  "elev": 80,  "note": "Locker · Darmstadium vorbereiten"},
-            {"d": "Sa", "type": "long",   "name": "Race-Simulation 1","km": 19, "elev": 450, "note": "Rucksack 7–8 kg · Mittagshitze · volle Race-Ernährung"},
-            {"d": "So", "type": "b2b",    "name": "Back-to-Back #2",  "km": 16, "elev": 270, "note": "Müde Beine! Pace egal · durchbeißen"},
+            {"d": "Fr", "type": "easy",   "name": "Aktivierung",      "km": 8,  "elev": 90,  "note": "Locker · Darmstadium vorbereiten"},
+            {"d": "Sa", "type": "long",   "name": "Race-Simulation 1","km": 21, "elev": 500, "note": "Rucksack 7–8 kg · Mittagshitze · volle Race-Ernährung"},
+            {"d": "So", "type": "b2b",    "name": "Back-to-Back #2",  "km": 17, "elev": 300, "note": "Müde Beine! Pace egal · durchbeißen"},
         ],
     },
     {
         "num": 6, "focus": "Peak", "color": "#e74c3c",
-        "total_km": 69, "total_elev": 1400,
+        "total_km": 76, "total_elev": 1560,
         "note": "Härteste Woche – mentale Stärke trainieren, Schmerz als Info werten",
         "days": [
             {"d": "Mo", "type": "active", "name": "Aktiv-Erholung",   "km": 0,  "elev": 0,   "note": "Spazieren · Beine hochlegen"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 10, "elev": 120, "note": "Rucksack 6 kg · locker"},
-            {"d": "Mi", "type": "hills",  "name": "Bergintervals",    "km": 12, "elev": 350, "note": "Schwere Beine tolerieren · Technik"},
-            {"d": "Do", "type": "easy",   "name": "Recovery Run",     "km": 7,  "elev": 80,  "note": "Sehr locker · mentale Vorbereitung"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 11, "elev": 130, "note": "Rucksack 6 kg · locker"},
+            {"d": "Mi", "type": "hills",  "name": "Bergintervals",    "km": 13, "elev": 400, "note": "Schwere Beine tolerieren · Technik"},
+            {"d": "Do", "type": "easy",   "name": "Recovery Run",     "km": 8,  "elev": 90,  "note": "Sehr locker · mentale Vorbereitung"},
             {"d": "Fr", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Schlafen · Ernährung optimieren"},
-            {"d": "Sa", "type": "long",   "name": "Race-Simulation 2","km": 22, "elev": 500, "note": "Tag 1 Etappe! Komplett ausgerüstet · Start 06:00 Uhr"},
-            {"d": "So", "type": "b2b",    "name": "Back-to-Back #3",  "km": 18, "elev": 350, "note": "Tag 2 Etappe! Kompletter Race-Mode · kein Abkürzen"},
+            {"d": "Sa", "type": "long",   "name": "Race-Simulation 2","km": 25, "elev": 580, "note": "Rucksack 8 kg · Tag 1 Etappe! Komplett ausgerüstet · Start 06:00 Uhr"},
+            {"d": "So", "type": "b2b",    "name": "Back-to-Back #3",  "km": 19, "elev": 360, "note": "Tag 2 Etappe! Kompletter Race-Mode · kein Abkürzen"},
         ],
     },
     {
         "num": 7, "focus": "Tapering", "color": "#16a085",
-        "total_km": 40, "total_elev": 650,
+        "total_km": 44, "total_elev": 720,
         "note": "Umfang runter, Intensität kurz halten – Ausrüstung finalisieren",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Erholen · Physio falls nötig"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 8,  "elev": 80,  "note": "Locker · Körpergefühl"},
-            {"d": "Mi", "type": "tempo",  "name": "Kurztempo",        "km": 10, "elev": 120, "note": "2 × 10 min Tempo · Beine erinnern"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 9,  "elev": 90,  "note": "Locker · Körpergefühl"},
+            {"d": "Mi", "type": "tempo",  "name": "Kurztempo",        "km": 11, "elev": 140, "note": "2 × 10 min Tempo · Beine erinnern"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Packliste abhaken"},
             {"d": "Fr", "type": "easy",   "name": "Easy Run",         "km": 7,  "elev": 70,  "note": "Rucksack 4 kg · letzter Gear-Check"},
-            {"d": "Sa", "type": "long",   "name": "Medium Long Run",  "km": 15, "elev": 380, "note": "Wüstenpace · Ausrüstung vollständig testen"},
+            {"d": "Sa", "type": "long",   "name": "Medium Long Run",  "km": 17, "elev": 420, "note": "Rucksack 5 kg · Wüstenpace · Ausrüstung vollständig testen"},
             {"d": "So", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Vollständige Ruhe · früh schlafen"},
         ],
     },
     {
         "num": 8, "focus": "Finaler Taper", "color": "#95a5a6",
-        "total_km": 22, "total_elev": 260,
+        "total_km": 25, "total_elev": 290,
         "note": "Beine frisch halten – niemals neue Schuhe oder Ausrüstung ausprobieren!",
         "days": [
             {"d": "Mo", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Ausrüstung packen · Rucksack wiegen"},
-            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 6,  "elev": 60,  "note": "Sehr locker · 30 min max"},
-            {"d": "Mi", "type": "easy",   "name": "Easy Run",         "km": 5,  "elev": 50,  "note": "Locker · Beine freihalten"},
+            {"d": "Di", "type": "easy",   "name": "Easy Run",         "km": 7,  "elev": 70,  "note": "Sehr locker · 35 min max"},
+            {"d": "Mi", "type": "easy",   "name": "Easy Run",         "km": 6,  "elev": 60,  "note": "Locker · Beine freihalten"},
             {"d": "Do", "type": "rest",   "name": "Ruhetag",          "km": 0,  "elev": 0,   "note": "Mentale Vorbereitung · Visualisieren"},
             {"d": "Fr", "type": "easy",   "name": "Aktivierung",      "km": 5,  "elev": 70,  "note": "20 min locker · kein Stress"},
-            {"d": "Sa", "type": "easy",   "name": "Letzter Lauf",     "km": 6,  "elev": 80,  "note": "30 min Aktivierung · alles gut fühlen"},
+            {"d": "Sa", "type": "easy",   "name": "Letzter Lauf",     "km": 7,  "elev": 90,  "note": "35 min Aktivierung · alles gut fühlen"},
             {"d": "So", "type": "rest",   "name": "Reise-Vorbereitung","km": 0, "elev": 0,   "note": "Früh schlafen · An-/Abreise planen"},
         ],
     },
@@ -674,6 +674,10 @@ def render_week_card(week, week_idx, zones=None):
         # Max HR for zone bar rendering
         max_hr = zones["hr"]["max"] if (zones and zones.get("hr")) else None
 
+        # Extract backpack weight from note if present
+        pack_match = re.search(r'Rucksack\s+([\d.,–-]+\s*kg)', day["note"])
+        pack_badge = f'<div class="day-pack">🎒 {pack_match.group(1)}</div>' if pack_match else ""
+
         day_data = json.dumps({
             "weekNum": week["num"],
             "weekFocus": week["focus"],
@@ -711,6 +715,7 @@ def render_week_card(week, week_idx, zones=None):
           <div class="day-workout">{day['name']}</div>
           <div class="day-km">{km_str}</div>
           {'<div class="day-elev">' + elev_str + '</div>' if elev_str else ''}
+          {pack_badge}
           <div class="day-note">{day['note']}</div>
           <div class="day-detail-hint">Details ansehen →</div>
         </div>"""
@@ -901,6 +906,7 @@ def render_html(athlete, stats, gpx_data=None):
   .day-workout {{ font-size:.82em; font-weight:700; color:#ecf0f1; line-height:1.2; }}
   .day-km {{ font-size:1em; font-weight:900; color:#f39c12; margin-top:2px; }}
   .day-elev {{ font-size:.75em; color:#3498db; }}
+  .day-pack {{ font-size:.72em; font-weight:700; color:#e67e22; background:rgba(230,126,34,.12); border:1px solid rgba(230,126,34,.3); border-radius:8px; padding:2px 6px; margin-top:4px; display:inline-block; }}
   .day-note {{ font-size:.72em; color:#7f8c8d; margin-top:auto; line-height:1.3; }}
 
   /* ── TABLES ──────────────────────── */
