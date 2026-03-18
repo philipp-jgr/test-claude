@@ -501,14 +501,54 @@ def render_gpx_section(gpx_data):
 
 
 TYPE_META = {
-    "rest":   {"bg": "#1a2633", "bar": "#2c3e50",  "icon": "😴", "label": "–"},
-    "easy":   {"bg": "#0d2818", "bar": "#27ae60",  "icon": "🟢", "label": "Easy"},
-    "tempo":  {"bg": "#2b1f00", "bar": "#f39c12",  "icon": "⚡", "label": "Tempo"},
-    "hills":  {"bg": "#2b1200", "bar": "#e67e22",  "icon": "⛰️",  "label": "Berge"},
-    "long":   {"bg": "#0a1f3d", "bar": "#2980b9",  "icon": "🔵", "label": "Lang"},
-    "b2b":    {"bg": "#1e0a2b", "bar": "#8e44ad",  "icon": "🔥", "label": "B2B"},
-    "active": {"bg": "#061a18", "bar": "#16a085",  "icon": "🌿", "label": "Aktiv"},
-    "race":   {"bg": "#2b0000", "bar": "#e74c3c",  "icon": "🏁", "label": "RACE"},
+    "rest": {
+        "bg": "#1a2633", "bar": "#2c3e50", "icon": "😴", "label": "–",
+        "hr_zone": "–", "hr_pct": "–", "hr_color": "#2c3e50",
+        "rpe_low": 0, "rpe_high": 1, "rpe_label": "Ruhe · keine Belastung",
+        "tips": ["Foam-Rolling 15–20 min", "Mobilität & Dehnen", "Schlaf 8+ h", "Ausreichend Wasser trinken", "Beine hochlegen"],
+    },
+    "easy": {
+        "bg": "#0d2818", "bar": "#27ae60", "icon": "🟢", "label": "Easy",
+        "hr_zone": "Zone 2", "hr_pct": "60–70 %", "hr_color": "#27ae60",
+        "rpe_low": 3, "rpe_high": 4, "rpe_label": "Locker · komfortabel · Gespräch möglich",
+        "tips": ["Nasentest: Immer durch die Nase atmen können", "Kadenz 175–180 spm anstreben", "Pace langsamer als gefühlt nötig", "Rucksack wie angegeben tragen", "Gut essen & trinken danach"],
+    },
+    "tempo": {
+        "bg": "#2b1f00", "bar": "#f39c12", "icon": "⚡", "label": "Tempo",
+        "hr_zone": "Zone 3–4", "hr_pct": "70–85 %", "hr_color": "#f39c12",
+        "rpe_low": 6, "rpe_high": 7, "rpe_label": "Anstrengend · kontrolliert · kein Gespräch",
+        "tips": ["Aufwärmen: 15 min locker vor dem Tempo", "Tempoabschnitte nie überpacen", "Abkühlen: 10 min locker ausklingen lassen", "HF im Zielbereich halten – nicht überziehen", "KH-Versorgung während und nach dem Lauf"],
+    },
+    "hills": {
+        "bg": "#2b1200", "bar": "#e67e22", "icon": "⛰️", "label": "Berge",
+        "hr_zone": "Zone 3–4", "hr_pct": "72–85 %", "hr_color": "#e67e22",
+        "rpe_low": 6, "rpe_high": 8, "rpe_label": "Hart bergauf · Erholung bergab",
+        "tips": ["Bergauf: kurze Schritte, Oberkörper leicht vorgelehnt", "Bergab: Bremsen vermeiden, Knie weich", "Auf flachen Abschnitten HF wieder senken", "Power-Hiking bergauf = spart Energie", "Marschtechnik (Stöcke) üben"],
+    },
+    "long": {
+        "bg": "#0a1f3d", "bar": "#2980b9", "icon": "🔵", "label": "Lang",
+        "hr_zone": "Zone 2–3", "hr_pct": "60–75 %", "hr_color": "#2980b9",
+        "rpe_low": 4, "rpe_high": 5, "rpe_label": "Moderat · nachhaltig · konversationsfähig",
+        "tips": ["Erste Hälfte bewusst langsamer als zweite", "Ernährung alle 45–60 min testen", "Hydration: 500 ml/h als Richtwert", "Rucksack vollständig bepacken wie im Rennen", "Mentale Stärke trainieren: Kopfkino positiv halten"],
+    },
+    "b2b": {
+        "bg": "#1e0a2b", "bar": "#8e44ad", "icon": "🔥", "label": "B2B",
+        "hr_zone": "Zone 2–3", "hr_pct": "62–76 %", "hr_color": "#8e44ad",
+        "rpe_low": 5, "rpe_high": 7, "rpe_label": "Moderat bis hart · müde Beine akzeptieren",
+        "tips": ["Ziel: Laufen auf müden Beinen – nicht Pace!", "Keine neuen Schuhe oder Ausrüstung testen", "Zwischen Tag 1 und 2: gut essen, Beine kühlen", "HF kann höher sein als normal – das ist okay", "Recovery-Protokoll nach dem Lauf konsequent"],
+    },
+    "active": {
+        "bg": "#061a18", "bar": "#16a085", "icon": "🌿", "label": "Aktiv",
+        "hr_zone": "Zone 1", "hr_pct": "< 60 %", "hr_color": "#16a085",
+        "rpe_low": 1, "rpe_high": 2, "rpe_label": "Sehr locker · aktive Erholung",
+        "tips": ["Spazieren, Schwimmen oder leichtes Radfahren", "Keine Intensität – Regeneration ist das Ziel", "Bewegung fördert Durchblutung und Erholung", "Dehnen & Mobilität 20–30 min", "Früh schlafen gehen"],
+    },
+    "race": {
+        "bg": "#2b0000", "bar": "#e74c3c", "icon": "🏁", "label": "RACE",
+        "hr_zone": "Zone 2–4", "hr_pct": "65–85 %", "hr_color": "#e74c3c",
+        "rpe_low": 6, "rpe_high": 8, "rpe_label": "Renntempo · nachhaltig über den Tag",
+        "tips": ["Früh starten (06:00) – Hitze meiden", "Siesta 12:00–15:00 Uhr strikt einhalten", "Wasser immer auf > 1,5 L auffüllen", "Ernährung alle 45 min – auch ohne Hunger", "Blasen sofort mit Leukoplast versorgen"],
+    },
 }
 
 
@@ -524,8 +564,31 @@ def render_week_card(week, week_idx):
         km_str = f"{day['km']} km" if day["km"] else "–"
         elev_str = f"▲ {day['elev']} m" if day["elev"] else ""
         day_date = start_date + timedelta(days=["Mo","Di","Mi","Do","Fr","Sa","So"].index(day["d"]))
+        # Build data payload for modal
+        day_data = json.dumps({
+            "weekNum": week["num"],
+            "weekFocus": week["focus"],
+            "weekColor": week["color"],
+            "d": day["d"],
+            "date": day_date.strftime("%d.%m.%Y"),
+            "type": day["type"],
+            "name": day["name"],
+            "km": day["km"],
+            "elev": day["elev"],
+            "note": day["note"],
+            "icon": m["icon"],
+            "bar": m["bar"],
+            "hr_zone": m["hr_zone"],
+            "hr_pct": m["hr_pct"],
+            "hr_color": m["hr_color"],
+            "rpe_low": m["rpe_low"],
+            "rpe_high": m["rpe_high"],
+            "rpe_label": m["rpe_label"],
+            "tips": m["tips"],
+        }, ensure_ascii=False)
         day_cells += f"""
-        <div class="day-cell" style="background:{m['bg']}; border-top: 3px solid {m['bar']}">
+        <div class="day-cell" style="background:{m['bg']}; border-top: 3px solid {m['bar']}; cursor:pointer"
+             onclick="openDayModal(this)" data-day='{day_data.replace("'", "&#39;")}'>
           <div class="day-header">
             <span class="day-name">{day['d']}</span>
             <span class="day-date-num">{day_date.strftime('%d.%m')}</span>
@@ -535,6 +598,7 @@ def render_week_card(week, week_idx):
           <div class="day-km">{km_str}</div>
           {'<div class="day-elev">' + elev_str + '</div>' if elev_str else ''}
           <div class="day-note">{day['note']}</div>
+          <div class="day-detail-hint">Details ansehen →</div>
         </div>"""
 
     is_race = week["num"] == 9
@@ -757,6 +821,94 @@ def render_html(athlete, stats, gpx_data=None):
 
   .footer {{ text-align:center; padding:40px; color:#5d6d7e; font-size:.83em; }}
 
+  /* ── DAY DETAIL HINT ─────────────── */
+  .day-detail-hint {{
+    font-size:.65em; color:#3498db; margin-top:auto; opacity:0;
+    transition: opacity .2s;
+    text-align:right; padding-top:4px;
+  }}
+  .day-cell:hover .day-detail-hint {{ opacity:1; }}
+  .day-cell:hover {{ box-shadow: inset 0 0 0 1px rgba(52,152,219,.4); }}
+
+  /* ── DAY MODAL ───────────────────── */
+  .day-modal-overlay {{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.75);
+    z-index:1000; align-items:center; justify-content:center; padding:20px;
+  }}
+  .day-modal-overlay.open {{ display:flex; }}
+  .day-modal {{
+    background:#141e2b; border-radius:20px; max-width:540px; width:100%;
+    border:1px solid #2c3e50; overflow:hidden; position:relative;
+    animation: modalIn .2s ease;
+  }}
+  @keyframes modalIn {{ from {{ transform:scale(.94); opacity:0; }} to {{ transform:scale(1); opacity:1; }} }}
+  .day-modal-header {{
+    padding:22px 26px 18px; display:flex; align-items:flex-start; gap:14px;
+    border-bottom:1px solid #1e2d3d;
+  }}
+  .day-modal-icon {{ font-size:2.4em; line-height:1; }}
+  .day-modal-title {{ flex:1; }}
+  .day-modal-title h2 {{ font-size:1.25em; font-weight:800; color:#ecf0f1; }}
+  .day-modal-title .day-modal-meta {{
+    font-size:.78em; color:#7f8c8d; margin-top:3px; display:flex; gap:12px; flex-wrap:wrap;
+  }}
+  .day-modal-close {{
+    background:none; border:none; color:#7f8c8d; font-size:1.6em; cursor:pointer;
+    line-height:1; padding:0 4px; transition:color .15s;
+  }}
+  .day-modal-close:hover {{ color:#ecf0f1; }}
+  .day-modal-body {{ padding:22px 26px; display:flex; flex-direction:column; gap:18px; }}
+
+  /* HR Zone */
+  .modal-section-label {{
+    font-size:.7em; text-transform:uppercase; letter-spacing:1.5px; color:#7f8c8d; margin-bottom:8px;
+  }}
+  .hr-zone-bar {{
+    display:flex; gap:3px; height:10px; border-radius:6px; overflow:hidden; margin-bottom:8px;
+  }}
+  .hr-zone-seg {{ flex:1; }}
+  .hr-zone-info {{ display:flex; justify-content:space-between; align-items:center; }}
+  .hr-zone-badge {{
+    padding:4px 12px; border-radius:20px; font-size:.78em; font-weight:700; color:#fff;
+  }}
+  .hr-zone-pct {{ font-size:.78em; color:#bdc3c7; }}
+
+  /* RPE */
+  .rpe-track {{
+    display:flex; gap:3px; margin-bottom:8px;
+  }}
+  .rpe-dot {{
+    flex:1; height:10px; border-radius:3px; background:#1e2d3d;
+    transition: background .15s;
+  }}
+  .rpe-info {{ display:flex; justify-content:space-between; align-items:center; }}
+  .rpe-label {{ font-size:.78em; color:#bdc3c7; }}
+  .rpe-num {{ font-size:.78em; color:#7f8c8d; }}
+
+  /* Workout stats row */
+  .modal-stats {{ display:flex; gap:10px; }}
+  .modal-stat {{
+    flex:1; background:#1e2d3d; border-radius:10px; padding:12px;
+    text-align:center; border:1px solid #2c3e50;
+  }}
+  .modal-stat .val {{ font-size:1.3em; font-weight:900; color:#f39c12; }}
+  .modal-stat .lbl {{ font-size:.65em; color:#7f8c8d; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }}
+
+  /* Tips */
+  .modal-tips {{ list-style:none; }}
+  .modal-tips li {{
+    font-size:.84em; padding:6px 0; border-bottom:1px solid #1e2d3d; color:#bdc3c7;
+    display:flex; gap:8px; align-items:flex-start;
+  }}
+  .modal-tips li:last-child {{ border-bottom:none; }}
+  .modal-tips li::before {{ content:"→"; color:#3498db; flex-shrink:0; }}
+
+  /* Note */
+  .modal-note {{
+    background:#111c29; border-radius:10px; padding:12px 16px;
+    font-size:.83em; color:#95a5a6; border-left:3px solid #2c3e50; font-style:italic;
+  }}
+
   @media(max-width:900px) {{
     .location-grid {{ grid-template-columns:1fr; }}
     .week-days {{ grid-template-columns:repeat(4,1fr); }}
@@ -771,6 +923,129 @@ def render_html(athlete, stats, gpx_data=None):
 </style>
 </head>
 <body>
+
+<!-- DAY DETAIL MODAL -->
+<div class="day-modal-overlay" id="dayModalOverlay" onclick="closeDayModal(event)">
+  <div class="day-modal" id="dayModal">
+    <div class="day-modal-header">
+      <div class="day-modal-icon" id="modalIcon"></div>
+      <div class="day-modal-title">
+        <h2 id="modalTitle"></h2>
+        <div class="day-modal-meta">
+          <span id="modalDate"></span>
+          <span id="modalWeek"></span>
+        </div>
+      </div>
+      <button class="day-modal-close" onclick="document.getElementById('dayModalOverlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="day-modal-body">
+      <!-- Stats -->
+      <div id="modalStats" class="modal-stats"></div>
+      <!-- HR Zone -->
+      <div id="modalHrSection">
+        <div class="modal-section-label">Herzfrequenz-Zone</div>
+        <div class="hr-zone-bar" id="modalHrBar">
+          <div class="hr-zone-seg" style="background:#1e6b2e"></div>
+          <div class="hr-zone-seg" style="background:#27ae60"></div>
+          <div class="hr-zone-seg" style="background:#f39c12"></div>
+          <div class="hr-zone-seg" style="background:#e67e22"></div>
+          <div class="hr-zone-seg" style="background:#e74c3c"></div>
+        </div>
+        <div class="hr-zone-info">
+          <span class="hr-zone-badge" id="modalHrBadge"></span>
+          <span class="hr-zone-pct" id="modalHrPct"></span>
+        </div>
+        <div style="font-size:.7em; color:#4a5a6a; margin-top:6px">Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 &gt;90% HFmax</div>
+      </div>
+      <!-- RPE -->
+      <div>
+        <div class="modal-section-label">RPE – Belastungsempfinden (1–10)</div>
+        <div class="rpe-track" id="modalRpeTrack"></div>
+        <div class="rpe-info">
+          <span class="rpe-label" id="modalRpeLabel"></span>
+          <span class="rpe-num" id="modalRpeNum"></span>
+        </div>
+      </div>
+      <!-- Note -->
+      <div class="modal-note" id="modalNote"></div>
+      <!-- Tips -->
+      <div>
+        <div class="modal-section-label">Trainings-Tipps</div>
+        <ul class="modal-tips" id="modalTips"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function openDayModal(el) {{
+  var d = JSON.parse(el.getAttribute('data-day'));
+  document.getElementById('modalIcon').textContent = d.icon;
+  document.getElementById('modalTitle').textContent = d.name;
+  document.getElementById('modalDate').textContent = d.d + ', ' + d.date;
+  document.getElementById('modalWeek').textContent = 'Woche ' + d.weekNum + ' – ' + d.weekFocus;
+
+  // Stats
+  var statsHtml = '';
+  if (d.km > 0) statsHtml += '<div class="modal-stat"><div class="val">' + d.km + ' km</div><div class="lbl">Distanz</div></div>';
+  if (d.elev > 0) statsHtml += '<div class="modal-stat"><div class="val">▲ ' + d.elev + ' m</div><div class="lbl">Anstieg</div></div>';
+  if (d.hr_zone !== '–') statsHtml += '<div class="modal-stat"><div class="val" style="color:' + d.hr_color + '">' + d.hr_zone + '</div><div class="lbl">HF-Zone</div></div>';
+  if (d.rpe_high > 0) statsHtml += '<div class="modal-stat"><div class="val">' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10</div><div class="lbl">RPE</div></div>';
+  document.getElementById('modalStats').innerHTML = statsHtml;
+
+  // HR Zone bar highlight
+  var hrBar = document.getElementById('modalHrBar');
+  var segs = hrBar.querySelectorAll('.hr-zone-seg');
+  var zoneColors = ['#1e6b2e','#27ae60','#f39c12','#e67e22','#e74c3c'];
+  var dimColors  = ['#0d2e14','#163d20','#2b1f00','#1e1000','#200000'];
+  segs.forEach(function(s, i) {{
+    s.style.background = dimColors[i];
+  }});
+  var zoneMap = {{'Zone 1':0,'Zone 2':1,'Zone 3':2,'Zone 3–4':[2,3],'Zone 4':3,'Zone 5':4,'Zone 2–3':[1,2],'Zone 2–4':[1,2,3]}};
+  var active = zoneMap[d.hr_zone];
+  if (active !== undefined) {{
+    if (!Array.isArray(active)) active = [active];
+    active.forEach(function(idx) {{ segs[idx].style.background = zoneColors[idx]; }});
+  }}
+  document.getElementById('modalHrBadge').textContent = d.hr_zone;
+  document.getElementById('modalHrBadge').style.background = d.hr_color;
+  document.getElementById('modalHrPct').textContent = d.hr_pct + ' HFmax';
+  var hrSection = document.getElementById('modalHrSection');
+  hrSection.style.display = (d.hr_zone === '–') ? 'none' : 'block';
+
+  // RPE track
+  var rpeTrack = document.getElementById('modalRpeTrack');
+  rpeTrack.innerHTML = '';
+  for (var i = 1; i <= 10; i++) {{
+    var dot = document.createElement('div');
+    dot.className = 'rpe-dot';
+    var active_rpe = (i >= d.rpe_low && i <= d.rpe_high);
+    var rpe_color = i <= 3 ? '#27ae60' : i <= 5 ? '#f1c40f' : i <= 7 ? '#e67e22' : '#e74c3c';
+    dot.style.background = active_rpe ? rpe_color : '#1e2d3d';
+    rpeTrack.appendChild(dot);
+  }}
+  document.getElementById('modalRpeLabel').textContent = d.rpe_label;
+  document.getElementById('modalRpeNum').textContent = 'RPE ' + (d.rpe_low === d.rpe_high ? d.rpe_low : d.rpe_low + '–' + d.rpe_high) + ' / 10';
+
+  // Note
+  document.getElementById('modalNote').textContent = d.note;
+
+  // Tips
+  var tips = d.tips || [];
+  document.getElementById('modalTips').innerHTML = tips.map(function(t) {{
+    return '<li>' + t + '</li>';
+  }}).join('');
+
+  document.getElementById('dayModalOverlay').classList.add('open');
+}}
+function closeDayModal(e) {{
+  if (e.target === document.getElementById('dayModalOverlay')) {{
+    document.getElementById('dayModalOverlay').classList.remove('open');
+  }}
+}}
+document.addEventListener('keydown', function(e) {{
+  if (e.key === 'Escape') document.getElementById('dayModalOverlay').classList.remove('open');
+}});
+</script>
 
 <div class="hero">
   <div class="sub">Race Preparation Report</div>
@@ -978,7 +1253,7 @@ def main():
     print("Generiere Report...")
     html = render_html(athlete, stats, gpx_data)
 
-    out = os.path.join(os.path.expanduser("~"), "Downloads", "tabernas_race_report.html")
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tabernas_race_report.html")
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
 
