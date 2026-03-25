@@ -11,7 +11,7 @@ import webbrowser
 import requests
 
 CLIENT_ID = "213446"
-CLIENT_SECRET = "9b56faed7fb43b7eecb9dee740714fb854d9cc02"
+CLIENT_SECRET = "bbec41ade2142ba422a2ff7b2fbc1dc22148f5ff"
 REDIRECT_URI = "http://localhost:8765"
 SCOPE = "activity:read_all,read"
 
