@@ -750,9 +750,85 @@ def render_week_card(week, week_idx, zones=None):
     </div>"""
 
 
+def compute_success_chance(stats):
+    score = 0
+
+    # 1. Ø Wochenumfang (35 Punkte)
+    avg_km = stats["avg_weekly_km"]
+    if avg_km >= 70:   vol_score, vol_label, vol_color = 35, "Exzellent",    "#27ae60"
+    elif avg_km >= 50: vol_score, vol_label, vol_color = 28, "Sehr gut",     "#2ecc71"
+    elif avg_km >= 35: vol_score, vol_label, vol_color = 21, "Gut",          "#f1c40f"
+    elif avg_km >= 20: vol_score, vol_label, vol_color = 13, "Ausbaufähig",  "#e67e22"
+    else:              vol_score, vol_label, vol_color =  6, "Niedrig",      "#e74c3c"
+    score += vol_score
+
+    # 2. Längster Lauf (30 Punkte)
+    long = stats["max_long_run"]
+    if long >= 30:   long_score, long_label, long_color = 30, "Exzellent",   "#27ae60"
+    elif long >= 22: long_score, long_label, long_color = 24, "Sehr gut",    "#2ecc71"
+    elif long >= 15: long_score, long_label, long_color = 18, "Gut",         "#f1c40f"
+    elif long >= 10: long_score, long_label, long_color = 11, "Ausbaufähig", "#e67e22"
+    else:            long_score, long_label, long_color =  5, "Niedrig",     "#e74c3c"
+    score += long_score
+
+    # 3. Konsistenz – Läufe pro Woche (20 Punkte)
+    rpw = stats["total_runs"] / 8
+    if rpw >= 4:   con_score, con_label, con_color = 20, "Sehr konstant", "#27ae60"
+    elif rpw >= 3: con_score, con_label, con_color = 15, "Konstant",      "#2ecc71"
+    elif rpw >= 2: con_score, con_label, con_color = 10, "Mäßig",         "#f1c40f"
+    else:          con_score, con_label, con_color =  5, "Unregelmäßig",  "#e67e22"
+    score += con_score
+
+    # 4. Ø Höhenmeter/Woche (15 Punkte)
+    elev = stats["avg_weekly_elev"]
+    if elev >= 500:   elev_score, elev_label, elev_color = 15, "Bergläufer", "#27ae60"
+    elif elev >= 300: elev_score, elev_label, elev_color = 12, "Gut",        "#2ecc71"
+    elif elev >= 150: elev_score, elev_label, elev_color =  9, "Moderat",    "#f1c40f"
+    else:             elev_score, elev_label, elev_color =  4, "Flachland",  "#e67e22"
+    score += elev_score
+
+    # Finish-Wahrscheinlichkeit: 35 % Basis + Skalierung auf max 85 %
+    finish_pct = 35 + int((score / 100) * 50)
+
+    if finish_pct >= 75:
+        overall, overall_color = "Sehr gute Chancen 💪", "#27ae60"
+        assessment = "Deine Basis ist stark. Mit dem 8-Wochen-Plan und konsequenter Ausführung hast du realistische Chancen, alle 4 Etappen zu finishen."
+    elif finish_pct >= 62:
+        overall, overall_color = "Gute Chancen 👍", "#2ecc71"
+        assessment = "Du bist auf einem guten Weg. Priorität: Long Runs konsequent absolvieren und die Back-to-Back Wochenenden nicht überspringen."
+    elif finish_pct >= 50:
+        overall, overall_color = "Machbar mit Plan 🎯", "#f1c40f"
+        assessment = "Die Basis ist vorhanden, aber der Aufbau bis zum Rennen ist entscheidend. Jede Trainingseinheit zählt – kein Training ohne Not auslassen."
+    else:
+        overall, overall_color = "Ambitioniertes Ziel 🔥", "#e67e22"
+        assessment = "Das Ziel ist ehrgeizig, aber nicht unmöglich. Fokus auf Konsistenz und Long Runs. Finish is the goal – Pace spielt keine Rolle."
+
+    return {
+        "finish_pct": finish_pct,
+        "overall": overall,
+        "overall_color": overall_color,
+        "assessment": assessment,
+        "factors": [
+            {"label": f"Ø Wochenumfang ({avg_km:.0f} km)", "score": vol_score, "max": 35, "rating": vol_label, "color": vol_color},
+            {"label": f"Längster Lauf ({long:.0f} km)",     "score": long_score, "max": 30, "rating": long_label, "color": long_color},
+            {"label": f"Konsistenz ({rpw:.1f} Läufe/Wo)",   "score": con_score,  "max": 20, "rating": con_label,  "color": con_color},
+            {"label": f"Höhenmeter ({elev:.0f} m/Wo)",      "score": elev_score, "max": 15, "rating": elev_label, "color": elev_color},
+        ],
+    }
+
+
 def render_html(athlete, stats, gpx_data=None):
     level, level_color = fitness_level(stats["avg_weekly_km"])
     race_gap_days = (RACE_DATE - TODAY).days
+    chance = compute_success_chance(stats)
+    chance_factors_html = "".join(f"""
+      <div class="chance-factor">
+        <div class="chance-factor-label">{f['label']}</div>
+        <div class="chance-factor-bar-wrap">
+          <div class="chance-factor-bar" style="width:{int(f['score']/f['max']*100)}%;background:{f['color']}"></div>
+        </div>
+        <div class="chance-factor-rating" style="color:{f['color']}">{f['rating']}</div>
+      </div>""" for f in chance["factors"])
 
     # Weekly chart bars
     chart_bars = ""
@@ -851,6 +927,21 @@ def render_html(athlete, stats, gpx_data=None):
   .card .value {{ font-size:2.1em; font-weight:900; color:#f39c12; }}
   .card .label {{ font-size:.76em; color:#7f8c8d; margin-top:4px; text-transform:uppercase; letter-spacing:1px; }}
   .level-badge {{ display:inline-block; padding:4px 14px; border-radius:20px; font-size:.85em; font-weight:700; color:#fff; background:{level_color}; }}
+
+  /* ── CHANCE ──────────────────────── */
+  .chance-box {{ background:#1e2d3d; border-radius:16px; padding:30px; border:1px solid #2c3e50; display:flex; gap:40px; align-items:center; flex-wrap:wrap; }}
+  .chance-gauge {{ text-align:center; min-width:160px; }}
+  .chance-pct {{ font-size:4em; font-weight:900; line-height:1; }}
+  .chance-label {{ font-size:1.05em; font-weight:700; margin-top:8px; }}
+  .chance-subtext {{ font-size:.8em; color:#7f8c8d; margin-top:4px; }}
+  .chance-details {{ flex:1; min-width:260px; }}
+  .chance-assessment {{ font-size:.9em; color:#bdc3c7; margin-bottom:20px; line-height:1.6; }}
+  .chance-factor {{ margin-bottom:14px; }}
+  .chance-factor-label {{ font-size:.82em; color:#7f8c8d; margin-bottom:5px; }}
+  .chance-factor-bar-wrap {{ background:#2c3e50; border-radius:6px; height:8px; overflow:hidden; margin-bottom:4px; }}
+  .chance-factor-bar {{ height:100%; border-radius:6px; transition:width .6s ease; }}
+  .chance-factor-rating {{ font-size:.78em; font-weight:600; }}
+  .chance-disclaimer {{ font-size:.75em; color:#5d6d7e; margin-top:20px; font-style:italic; }}
 
   /* ── CHART ───────────────────────── */
   .chart-container {{ background:#1e2d3d; border-radius:16px; padding:30px; border:1px solid #2c3e50; }}
@@ -1260,6 +1351,23 @@ document.addEventListener('keydown', function(e) {{
       <div class="card"><div class="value">{stats['total_dist']:.0f} km</div><div class="label">Gesamt-Distanz</div></div>
       <div class="card"><div class="value">{stats['total_runs']}</div><div class="label">Laufaktivitäten</div></div>
       <div class="card"><div class="value">{f"{stats['avg_hr']:.0f}" if stats['avg_hr'] else '–'} bpm</div><div class="label">Ø Herzfrequenz</div></div>
+    </div>
+  </div>
+
+  <!-- ERFOLGSWAHRSCHEINLICHKEIT -->
+  <div class="section">
+    <div class="section-title">🎯 Finishwahrscheinlichkeit – basierend auf deinen Strava-Daten</div>
+    <div class="chance-box">
+      <div class="chance-gauge">
+        <div class="chance-pct" style="color:{chance['overall_color']}">{chance['finish_pct']} %</div>
+        <div class="chance-label" style="color:{chance['overall_color']}">{chance['overall']}</div>
+        <div class="chance-subtext">Tabernas Desert Ultra 2026</div>
+      </div>
+      <div class="chance-details">
+        <div class="chance-assessment">{chance['assessment']}</div>
+        {chance_factors_html}
+        <div class="chance-disclaimer">* Basiert auf deinen Strava-Daten der letzten 8 Wochen. Faktoren wie Hitzeadaption, Ernährung, Ausrüstung und mentale Stärke sind nicht einberechnet.</div>
+      </div>
     </div>
   </div>
 
